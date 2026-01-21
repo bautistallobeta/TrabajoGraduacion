@@ -1,0 +1,611 @@
+openapi: 3.0.3
+info:
+  title: MSTF - Microservicio de Transacciones Financieras
+  description: |
+    API REST para gestión de cuentas y transferencias financieras utilizando TigerBeetle como base de datos.
+
+    **Arquitectura:**
+    - Transferencias procesadas de forma asíncrona mediante Kafka
+    - Notificaciones síncronas vía Webhook
+    - Historial de balances habilitado para todas las cuentas
+
+    **Notas importantes:**
+    - Todos los IDs son Uint128 representados como strings decimales
+    - Las transferencias se procesan en lotes (batching)
+    - El estado de una cuenta puede ser "A" (activa) o "I" (inactiva/cerrada)
+  version: 1.0.0
+  contact:
+    name: Bautista José Llobeta
+
+servers:
+  - url: http://localhost:8080
+    description: Desarrollo local
+
+tags:
+  - name: Health
+    description: Endpoints de salud del servicio
+  - name: Cuentas
+    description: Operaciones sobre cuentas financieras
+  - name: Transferencias
+    description: Operaciones sobre transferencias financieras
+
+paths:
+  /hola:
+    get:
+      tags:
+        - Health
+      summary: Health check del servicio
+      description: Verifica que el servicio esté funcionando correctamente
+      operationId: healthCheck
+      responses:
+        '200':
+          description: Servicio funcionando correctamente
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: "Hola Mundo desde API MSTF."
+
+  /cuentas/{id_cuenta}:
+    get:
+      tags:
+        - Cuentas
+      summary: Obtener cuenta por ID
+      description: Recupera la información completa de una cuenta específica por su ID
+      operationId: getCuenta
+      parameters:
+        - name: id_cuenta
+          in: path
+          required: true
+          description: ID de la cuenta (Uint128 en formato decimal string)
+          schema:
+            type: string
+          example: "100000000000000000001"
+      responses:
+        '200':
+          description: Cuenta encontrada exitosamente
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Cuenta'
+        '400':
+          description: ID de cuenta inválido o formato incorrecto
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorRespuesta'
+              example:
+                error: "IdCuenta formato incorrecto"
+        '404':
+          description: Cuenta no encontrada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorRespuesta'
+              example:
+                error: "Cuenta no encontrada en TigerBeetle"
+
+  /cuentas/{id_cuenta}/historial:
+    get:
+      tags:
+        - Cuentas
+      summary: Obtener historial de balances de una cuenta
+      description: |
+        Recupera el historial de balances de una cuenta a lo largo del tiempo.
+        Cada entrada representa el estado del balance después de una transferencia.
+
+        **Nota:** Este endpoint requiere que la cuenta tenga el flag `History` activado (se activa automáticamente en todas las cuentas nuevas).
+      operationId: getHistorialCuenta
+      parameters:
+        - name: id_cuenta
+          in: path
+          required: true
+          description: ID de la cuenta (Uint128 en formato decimal string)
+          schema:
+            type: string
+          example: "100000000000000000001"
+        - name: timestamp_min
+          in: query
+          required: false
+          description: Timestamp mínimo (nanosegundos desde epoch). 0 o vacío = sin filtro
+          schema:
+            type: integer
+            format: uint64
+            default: 0
+          example: 1704067200000000000
+        - name: timestamp_max
+          in: query
+          required: false
+          description: Timestamp máximo (nanosegundos desde epoch). 0 o vacío = sin filtro
+          schema:
+            type: integer
+            format: uint64
+            default: 0
+          example: 1704153600000000000
+        - name: limite
+          in: query
+          required: false
+          description: Número máximo de registros a retornar
+          schema:
+            type: integer
+            format: uint32
+            default: 100
+          example: 50
+      responses:
+        '200':
+          description: Historial obtenido exitosamente
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id_cuenta:
+                    type: string
+                    description: ID de la cuenta consultada
+                    example: "100000000000000000001"
+                  total:
+                    type: integer
+                    description: Cantidad de registros en el historial
+                    example: 3
+                  historial:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/BalanceHistorial'
+        '400':
+          description: Parámetros inválidos
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorRespuesta'
+              example:
+                error: "Parámetro 'timestamp_min' inválido"
+        '404':
+          description: Cuenta no encontrada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorRespuesta'
+        '500':
+          description: Error interno al obtener historial
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorRespuesta'
+
+  /cuentas:
+    get:
+      tags:
+        - Cuentas
+      summary: Buscar cuentas con filtros
+      description: |
+        Busca cuentas aplicando filtros opcionales.
+
+        **Filtros disponibles:**
+        - Por usuario final (id_usuario_final)
+        - Por ledger (id_ledger)
+        - Por tipo de cuenta (tipo)
+        - Por estado (estado: "A" o "I")
+
+        **Notas:**
+        - Valores 0 o vacíos deshabilitan ese filtro específico
+        - El parámetro `limit` controla el máximo total de resultados retornados
+        - Si hay más resultados disponibles que el límite, solo se retornan los primeros N
+      operationId: buscarCuentas
+      parameters:
+        - name: id_usuario_final
+          in: query
+          required: false
+          description: Filtrar por ID de usuario final. 0 o vacío = sin filtro
+          schema:
+            type: integer
+            format: uint64
+            default: 0
+          example: 12345
+        - name: id_ledger
+          in: query
+          required: false
+          description: Filtrar por ID de ledger. 0 o vacío = sin filtro
+          schema:
+            type: integer
+            format: uint32
+            default: 0
+          example: 1
+        - name: tipo
+          in: query
+          required: false
+          description: Filtrar por tipo de cuenta (code). 0 o vacío = sin filtro
+          schema:
+            type: integer
+            format: uint16
+            default: 0
+          example: 1
+        - name: estado
+          in: query
+          required: false
+          description: 'Filtrar por estado: "A" (activo), "I" (inactivo), vacío = sin filtro'
+          schema:
+            type: string
+            enum: ['A', 'I', '']
+            default: ''
+          example: "A"
+        - name: limit
+          in: query
+          required: false
+          description: Número máximo total de resultados a retornar
+          schema:
+            type: integer
+            format: uint32
+            minimum: 1
+            maximum: 500
+            default: 100
+          example: 100
+      responses:
+        '200':
+          description: Búsqueda exitosa (puede retornar array vacío si no hay coincidencias)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  total:
+                    type: integer
+                    description: Cantidad total de cuentas encontradas
+                    example: 2
+                  cuentas:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Cuenta'
+        '400':
+          description: Parámetros de búsqueda inválidos
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorRespuesta'
+              examples:
+                invalidLimit:
+                  value:
+                    error: "limit no puede ser mayor a 500"
+                invalidEstado:
+                  value:
+                    error: "estado debe ser 'A' (activo), 'I' (inactivo), o vacío"
+        '500':
+          description: Error interno al buscar cuentas
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorRespuesta'
+
+    post:
+      tags:
+        - Cuentas
+      summary: Crear nueva cuenta
+      description: |
+        Crea una nueva cuenta en TigerBeetle con los siguientes flags automáticos:
+        - `DebitsMustNotExceedCredits`: true (previene saldo negativo)
+        - `History`: true (habilita historial de balances)
+
+        El ID de la cuenta se genera automáticamente concatenando ledger y usuario final.
+      operationId: crearCuenta
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - id_usuario_final
+                - id_ledger
+                - fecha_alta
+              properties:
+                id_usuario_final:
+                  type: integer
+                  format: uint64
+                  description: ID del usuario propietario de la cuenta
+                  example: 12345
+                id_ledger:
+                  type: integer
+                  format: uint32
+                  description: ID del ledger al que pertenece la cuenta
+                  example: 1
+                fecha_alta:
+                  type: string
+                  description: Fecha de alta de la cuenta (formato timestamp o fecha)
+                  example: "2024-01-01 10:00:00"
+      responses:
+        '201':
+          description: Cuenta creada exitosamente
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: "OK: Cuenta creada exitosamente"
+                  id:
+                    type: string
+                    description: ID de la cuenta creada (Uint128 en formato decimal)
+                    example: "100000000000000012345"
+        '400':
+          description: Datos de entrada inválidos o faltantes
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorRespuesta'
+              examples:
+                camposFaltantes:
+                  value:
+                    error: "Faltan campos requeridos: id_usuario_final, id_ledger"
+                jsonInvalido:
+                  value:
+                    error: "JSON inválido o tipo de datos incorrecto"
+        '409':
+          description: Error al crear la cuenta (posible duplicado o error de TigerBeetle)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorRespuesta'
+              example:
+                error: "Error al crear cuenta: exists"
+
+  /transferencias/{id_transferencia}:
+    get:
+      tags:
+        - Transferencias
+      summary: Obtener transferencia por ID
+      description: Recupera la información completa de una transferencia específica por su ID
+      operationId: getTransferencia
+      parameters:
+        - name: id_transferencia
+          in: path
+          required: true
+          description: ID de la transferencia (Uint128 en formato decimal string)
+          schema:
+            type: string
+          example: "200000000000000000001"
+      responses:
+        '200':
+          description: Transferencia encontrada exitosamente
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Transferencia'
+        '400':
+          description: ID de transferencia inválido
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorRespuesta'
+        '404':
+          description: Transferencia no encontrada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorRespuesta'
+              example:
+                error: "Transferencia no encontrada"
+
+  /transferencias:
+    post:
+      tags:
+        - Transferencias
+      summary: Crear nueva transferencia (asíncrono)
+      description: |
+        Crea una nueva transferencia enviándola a la cola de Kafka para procesamiento asíncrono.
+
+        **Flujo de procesamiento:**
+        1. La transferencia se valida y se publica en Kafka
+        2. El consumidor la procesa en lotes (batching)
+        3. Se ejecuta en TigerBeetle
+        4. Se envía notificación vía Webhook
+        5. Se hace commit en Kafka solo si todo fue exitoso
+
+        **Importante:** Este endpoint retorna 202 Accepted inmediatamente. El procesamiento real ocurre de forma asíncrona.
+      operationId: crearTransferencia
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CrearTransferenciaRequest'
+      responses:
+        '202':
+          description: Transferencia aceptada y encolada en Kafka para procesamiento
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  mensaje:
+                    type: string
+                    example: "Transferencia aceptada y encolada en Kafka."
+                  id:
+                    type: string
+                    description: ID de la transferencia aceptada
+                    example: "200000000000000000001"
+        '400':
+          description: Datos de entrada inválidos
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorRespuesta'
+              examples:
+                montoInvalido:
+                  value:
+                    error: "Monto debe ser mayor a cero"
+                camposFaltantes:
+                  value:
+                    error: "IdTransferencia, IdCuentaDebito e IdCuentaCredito son obligatorios"
+        '500':
+          description: Error al publicar en Kafka
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorRespuesta'
+              example:
+                error: "Error al publicar en Kafka: connection refused"
+
+components:
+  schemas:
+    Cuenta:
+      type: object
+      description: Información completa de una cuenta financiera
+      properties:
+        IdCuenta:
+          type: string
+          description: ID único de la cuenta (Uint128 en formato decimal)
+          example: "100000000000000012345"
+        IdUsuarioFinal:
+          type: integer
+          format: uint64
+          description: ID del usuario propietario de la cuenta
+          example: 12345
+        IdLedger:
+          type: integer
+          format: uint32
+          description: ID del ledger al que pertenece la cuenta
+          example: 1
+        Creditos:
+          type: string
+          description: Total de créditos posteados (Uint128 en formato decimal)
+          example: "50000"
+        Debitos:
+          type: string
+          description: Total de débitos posteados (Uint128 en formato decimal)
+          example: "25000"
+        Tipo:
+          type: integer
+          format: uint64
+          description: Tipo o código de la cuenta
+          example: 1
+        Estado:
+          type: string
+          enum: ['A', 'I']
+          description: 'Estado de la cuenta: A (activa), I (inactiva/cerrada)'
+          example: "A"
+        FechaAlta:
+          type: string
+          description: Fecha de alta de la cuenta (almacenada en UserData32, precisión de segundos)
+          example: "2024-01-01 10:00:00"
+        FechaRegistro:
+          type: string
+          description: Timestamp de registro en TigerBeetle (asignado automáticamente, precisión de nanosegundos)
+          example: "2024-01-01 10:00:00.123456789"
+
+    BalanceHistorial:
+      type: object
+      description: Registro histórico del balance de una cuenta en un momento específico
+      properties:
+        debitos:
+          type: string
+          description: Débitos posteados al momento del registro (Uint128 en formato decimal)
+          example: "10000"
+        creditos:
+          type: string
+          description: Créditos posteados al momento del registro (Uint128 en formato decimal)
+          example: "25000"
+        balance:
+          type: string
+          description: Balance neto calculado como creditos - debitos
+          example: "15000"
+        timestamp:
+          type: integer
+          format: uint64
+          description: Timestamp del registro (nanosegundos desde epoch)
+          example: 1704067200000000000
+
+    Transferencia:
+      type: object
+      description: Información completa de una transferencia financiera
+      properties:
+        IdTransferencia:
+          type: string
+          description: ID único de la transferencia (Uint128 en formato decimal)
+          example: "200000000000000000001"
+        IdCuentaDebito:
+          type: string
+          description: ID de la cuenta desde donde se debita (Uint128 en formato decimal)
+          example: "100000000000000012345"
+        IdCuentaCredito:
+          type: string
+          description: ID de la cuenta a donde se acredita (Uint128 en formato decimal)
+          example: "100000000000000067890"
+        IdLedger:
+          type: integer
+          format: uint32
+          description: ID del ledger de la transferencia
+          example: 1
+        Monto:
+          type: string
+          description: Monto de la transferencia (Uint128 en formato decimal)
+          example: "5000"
+        Categoria:
+          type: integer
+          format: uint64
+          description: Categoría de la transferencia (almacenada en UserData64)
+          example: 101
+        Tipo:
+          type: integer
+          format: uint16
+          description: Flags de la transferencia
+          example: 0
+        Fecha:
+          type: string
+          description: Fecha y hora de la transferencia
+          example: "2024-01-01 15:30:45.123456789"
+        Estado:
+          type: string
+          description: Estado de la transferencia
+          example: "F"
+
+    CrearTransferenciaRequest:
+      type: object
+      required:
+        - id_transferencia
+        - id_cuenta_debito
+        - id_cuenta_credito
+        - monto
+        - ledger
+        - id_categoria
+        - fecha
+      properties:
+        id_transferencia:
+          type: string
+          description: ID único para la transferencia (Uint128 en formato decimal)
+          example: "200000000000000000001"
+        id_cuenta_debito:
+          type: string
+          description: ID de la cuenta desde donde se debita (Uint128 en formato decimal)
+          example: "100000000000000012345"
+        id_cuenta_credito:
+          type: string
+          description: ID de la cuenta a donde se acredita (Uint128 en formato decimal)
+          example: "100000000000000067890"
+        monto:
+          type: integer
+          format: uint64
+          description: Monto de la transferencia (debe ser mayor a 0)
+          example: 5000
+        ledger:
+          type: integer
+          format: uint32
+          description: ID del ledger (debe ser mayor a 0)
+          example: 1
+        id_categoria:
+          type: integer
+          format: uint64
+          description: ID de categoría de la transferencia
+          example: 101
+        fecha:
+          type: string
+          description: Fecha y hora de la transferencia (formato datetime string)
+          example: "2024-01-01 15:30:45.123456789"
+
+    ErrorRespuesta:
+      type: object
+      description: Estructura estándar de respuesta de error
+      properties:
+        error:
+          type: string
+          description: Mensaje descriptivo del error
+          example: "Error al procesar la solicitud"

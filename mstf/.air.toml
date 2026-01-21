@@ -1,0 +1,23 @@
+# Config para la herramienta 'air' (para live-reload)
+
+# Directorio raíz
+root = "."
+# Directorio para binarios temporales
+tmp_dir = "tmp"
+
+[build]
+cmd = "go build -o ./tmp/mstf-app.exe ./cmd/app/main.go"
+bin = "./tmp/mstf-app.exe"
+
+include_ext = ["go", "toml", "mod", "env"]
+exclude_dir = ["tmp", "vendor"]
+# Delay p cuando se guarda varias veces rápdido
+delay = 3000
+
+[log]
+#Muestra logs en teimpo real
+time = true
+
+[misc]
+#Borra binario cuando se termina
+clean_on_exit = true
