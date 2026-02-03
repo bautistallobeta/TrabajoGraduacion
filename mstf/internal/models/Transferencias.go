@@ -52,7 +52,7 @@ func (t *Transferencia) Dame() error {
 	t.IdCuentaCredito = utils.Uint128AStringDecimal(transferenciaTB.CreditAccountID)
 	t.IdLedger = transferenciaTB.Ledger
 	t.Monto = utils.Uint128AStringDecimal(transferenciaTB.Amount)
-	t.Categoria = uint64(transferenciaTB.Code)
+	t.Categoria = transferenciaTB.UserData64
 	t.Tipo = uint16(transferenciaTB.Flags)
 	t.Fecha = fecha
 	t.Estado = "F"
