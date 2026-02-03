@@ -40,12 +40,12 @@ func Load() Config {
 	cfg.DireccionesTigerBeetle = []string{tbAddr}
 
 	// Webhook
-	cfg.URLWebhook = mustGetEnv("WEBHOOK_URL", "http://1bc01e79058ef53d7f2egth9quayyyyyb.oast.pro")
+	cfg.URLWebhook = mustGetEnv("WEBHOOK_URL", "https://1bc01e79058ef53d7f2egth9quayyyyyb.oast.pro")
 
 	//  Kafka
 	kafkaBrokerStr := mustGetEnv("KAFKA_BROKERS", "localhost:9092")
 	cfg.BrokersKafka = strings.Split(kafkaBrokerStr, ",")
-	cfg.TopicKafka = mustGetEnv("KAFKA_TOPIC", "transferencias_pendientes")
+	cfg.TopicKafka = mustGetEnv("KAFKA_TOPIC", "transfers_pendientes")
 	cfg.GroupIDKafka = mustGetEnv("KAFKA_GROUP_ID", "mstf_consumers_v1")
 	cfg.TamanoLoteKafka = mustGetEnvInt("KAFKA_BATCH_SIZE", 3)
 	cfg.TimeoutLoteKafka = time.Duration(mustGetEnvInt("KAFKA_BATCH_TIMEOUT_MS", 20000)) * time.Millisecond

@@ -9,7 +9,7 @@ require (
 )
 
 require (
-	github.com/joho/godotenv v1.5.1 // indirect
+	github.com/joho/godotenv v1.5.1 // direct
 	github.com/klauspost/compress v1.15.9 // indirect
 	github.com/labstack/gommon v0.4.2 // indirect
 	github.com/mattn/go-colorable v0.1.14 // indirect
