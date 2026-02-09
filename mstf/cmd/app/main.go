@@ -63,6 +63,11 @@ func main() {
 		log.Fatalf("FATAL: No se pudo conectar a TigerBeetle: %v", err)
 	}
 
+	// Conexión a db MySQL
+	if err := persistence.InitMySQLClient(cfg); err != nil {
+		log.Fatalf("FATAL: No se pudo conectar a MySQL: %v", err)
+	}
+
 	// TODO: corregir creacipon de cuentas empresa - de momento hardcodeado
 	inicializarCuentaEmpresa()
 
@@ -101,10 +106,11 @@ func main() {
 
 	log.Println("Apagando servidor...")
 
-	// apagar consumer y producer kafka y cerrar conexion a TB
+	// apagar consumer y producer kafka y cerrar conexiones a TB y MySQL
 	consumidor.Close()
 	productor.Close()
 	persistence.CloseTBClient()
+	persistence.CloseMySQLClient()
 
 	// apagar server (con timeout)
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
