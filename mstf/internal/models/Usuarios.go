@@ -34,11 +34,11 @@ func (u *Usuarios) Dame(tokenSesion string) error {
 // Valida credenciales, regenera el token de sesión y devuelve los datos del usuario.
 // pPassword debe venir ya hasheado con md5 desde el cliente.
 // Devuelve OK + datos del usuario o el mensaje
-// tsp_iniciar_sesion_usuario
+// tsp_login_usuario
 // - usuario: nombre de usuario que intenta iniciar sesión
 // - password: contraseña hasheada con md5 del usuario que intenta iniciar sesión
-func (u *Usuarios) IniciarSesion(usuario string, password string) (string, error) {
-	rows, err := persistence.ClienteMySQL.Query("CALL tsp_iniciar_sesion_usuario(?, ?)", usuario, password)
+func (u *Usuarios) Login(usuario string, password string) (string, error) {
+	rows, err := persistence.ClienteMySQL.Query("CALL tsp_login_usuario(?, ?)", usuario, password)
 	if err != nil {
 		return "", err
 	}
