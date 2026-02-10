@@ -109,9 +109,6 @@ func (cc *CuentasControlador) DameHistorialCuenta(c echo.Context) error {
 	cuenta := &models.Cuenta{IdCuenta: req.IdCuenta}
 	balances, err := cuenta.DameHistorialBalances(timestampMin, timestampMax, limite)
 	if err != nil {
-		if err != nil {
-			return c.JSON(http.StatusNotFound, models.NewErrorRespuesta(err.Error()))
-		}
 		return c.JSON(http.StatusInternalServerError, models.NewErrorRespuesta("Error al obtener historial: "+err.Error()))
 	}
 
