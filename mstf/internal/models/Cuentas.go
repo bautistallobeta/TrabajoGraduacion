@@ -22,9 +22,6 @@ type Cuenta struct {
 	FechaRegistro  string
 }
 
-// Constantes
-var ErrCuentaNoEncontrada = errors.New("Cuenta no encontrada en TigerBeetle")
-
 // TODO: limite se tiene que obtener de db relacional
 const LimiteHistorialBalances uint32 = 100
 
@@ -47,7 +44,7 @@ func (c *Cuenta) Dame() error {
 	}
 
 	if len(accounts) == 0 {
-		return ErrCuentaNoEncontrada
+		return errors.New("Cuenta no encontrada en TigerBeetle")
 	}
 
 	cuentaTB := accounts[0]
