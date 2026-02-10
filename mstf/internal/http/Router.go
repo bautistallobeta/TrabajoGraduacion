@@ -7,6 +7,7 @@ import (
 	"MSTransaccionesFinancieras/internal/config"
 	"MSTransaccionesFinancieras/internal/controllers"
 	"MSTransaccionesFinancieras/internal/gestores"
+	httpMiddleware "MSTransaccionesFinancieras/internal/http/middlewares"
 	"MSTransaccionesFinancieras/internal/infra/kafkamstf"
 	"MSTransaccionesFinancieras/internal/infra/persistence"
 	"MSTransaccionesFinancieras/internal/infra/webhook"
@@ -21,6 +22,7 @@ func InitRouter(cfg config.Config, notificador *webhook.Notificador) *echo.Echo 
 		middleware.Recover(),
 		middleware.Logger(),
 		middleware.CORS(),
+		httpMiddleware.TokenAuth(),
 	)
 
 	initRoutes(e, notificador)
