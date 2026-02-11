@@ -38,6 +38,8 @@ func initRoutes(router *echo.Echo, notificador *webhook.Notificador) {
 	productorKafka, _ := kafkamstf.InitProductor(config.Load())
 	cuentasControlador := controllers.NewCuentasControlador(gestorCuentas)
 	transferenciasControlador := controllers.NewTransferenciasControlador(gestorTransferencias, productorKafka)
+	gestorUsuarios := gestores.NewGestorUsuarios(persistence.ClienteMySQL)
+	usuariosControlador := controllers.NewUsuariosControlador(gestorUsuarios)
 
 	// Endpoint de prueba
 	router.GET("/hola", mainControlador.Hola)
@@ -51,4 +53,8 @@ func initRoutes(router *echo.Echo, notificador *webhook.Notificador) {
 	//Transferencias
 	router.GET("/transferencias/:id_transferencia", transferenciasControlador.DameTransferencia)
 	router.POST("/transferencias", transferenciasControlador.CrearTransferencia)
+
+	// Usuarios
+	router.POST("/usuarios", usuariosControlador.Crear)
+
 }

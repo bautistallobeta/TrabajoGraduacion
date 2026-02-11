@@ -8,7 +8,6 @@ import (
 type Usuarios struct {
 	IdUsuario     int    `json:"id_usuario"`
 	NombreUsuario string `json:"nombre_usuario"`
-	Email         string `json:"email"`
 	TokenSesion   string `json:"token_sesion"`
 	Estado        string `json:"estado"`
 }
@@ -16,15 +15,16 @@ type Usuarios struct {
 // Instancia un usuario específico por su ID.
 // tsp_dame_usuario
 // - tokenSesion: token de sesión del usuario que realiza la operación
+// - idUsuario: Id del usuario a instanciar
 func (u *Usuarios) Dame(tokenSesion string) error {
-	rows, err := persistence.ClienteMySQL.Query("CALL tsp_dame_usuario(?)", tokenSesion)
+	rows, err := persistence.ClienteMySQL.Query("CALL tsp_dame_usuario(?, ?)", tokenSesion, u.IdUsuario)
 	if err != nil {
 		return err
 	}
 	defer rows.Close()
 
 	if rows.Next() {
-		return rows.Scan(&u.IdUsuario, &u.NombreUsuario, &u.Email, &u.Estado)
+		return rows.Scan(&u.IdUsuario, &u.NombreUsuario, &u.Estado)
 	}
 
 	return nil
@@ -32,8 +32,9 @@ func (u *Usuarios) Dame(tokenSesion string) error {
 
 // Permite a un usuario iniciar sesión en el sistema administrativo de MSTF.
 // Valida credenciales, regenera el token de sesión y devuelve los datos del usuario.
+// Si el usuario está Pendiente, permite login pero indica que debe cambiar contraseña.
 // pPassword debe venir ya hasheado con md5 desde el cliente.
-// Devuelve OK + datos del usuario o el mensaje
+// Devuelve OK + datos del usuario o el mensaje de error
 // tsp_login_usuario
 // - usuario: nombre de usuario que intenta iniciar sesión
 // - password: contraseña hasheada con md5 del usuario que intenta iniciar sesión
@@ -45,7 +46,7 @@ func (u *Usuarios) Login(usuario string, password string) (string, error) {
 	defer rows.Close()
 	var mensaje string
 	if rows.Next() {
-		err = rows.Scan(&mensaje, &u.IdUsuario, &u.NombreUsuario, &u.Email, &u.TokenSesion)
+		err = rows.Scan(&mensaje, &u.IdUsuario, &u.NombreUsuario, &u.TokenSesion)
 		if err != nil {
 			return "", err
 		}
@@ -58,6 +59,7 @@ func (u *Usuarios) Login(usuario string, password string) (string, error) {
 // Devuelve OK o el mensaje de error
 // tsp_activar_usuario
 // - tokenSesion: token de sesión del usuario que realiza la operación
+// - idUsuario: Id del usuario a activar
 func (u *Usuarios) Activar(tokenSesion string) (string, error) {
 	var mensaje string
 	err := persistence.ClienteMySQL.QueryRow("CALL tsp_activar_usuario(?, ?)", tokenSesion, u.IdUsuario).Scan(&mensaje)
@@ -76,10 +78,8 @@ func (u *Usuarios) Desactivar(tokenSesion string) (string, error) {
 	return mensaje, err
 }
 
-// Permite al usuario pendiente confirmar la cuenta creada ingresando una contraseña nueva y pasando al
-// estado activo. La política de contraseñas establece que ésta debe tener una longitud mínima de 6
-// caracteres y debe incluir por lo menos una letra y un número. La nueva contraseña debe coincidir
-// con la confirmación. Crea la contraseña y activa al usuario.
+// Permite al usuario Pendiente cambiar su contraseña temporal y activarse.
+// Requiere haber iniciado sesión (tener token válido de tsp_login_usuario).
 // Devuelve OK o el mensaje de error
 // tsp_confirmar_cuenta_usuario
 // - idUsuario: Id del usuario a confirmar

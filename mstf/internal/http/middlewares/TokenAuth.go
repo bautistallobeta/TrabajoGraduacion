@@ -16,7 +16,7 @@ func TokenAuth() echo.MiddlewareFunc {
 			if authHeader == "" {
 				return c.JSON(
 					http.StatusUnauthorized,
-					models.NewErrorRespuesta("Falta header Authorization"),
+					models.NewErrorRespuesta("No Autorizado"),
 				)
 			}
 
@@ -24,7 +24,7 @@ func TokenAuth() echo.MiddlewareFunc {
 			if len(partes) != 2 || strings.ToLower(partes[0]) != "bearer" {
 				return c.JSON(
 					http.StatusUnauthorized,
-					models.NewErrorRespuesta("Formato de Authorization inválido"),
+					models.NewErrorRespuesta("No Autorizado"),
 				)
 			}
 
@@ -32,7 +32,7 @@ func TokenAuth() echo.MiddlewareFunc {
 			if token == "" {
 				return c.JSON(
 					http.StatusUnauthorized,
-					models.NewErrorRespuesta("Token vacío"),
+					models.NewErrorRespuesta("No Autorizado"),
 				)
 			}
 

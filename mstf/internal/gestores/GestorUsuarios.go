@@ -13,35 +13,36 @@ func NewGestorUsuarios(db *sql.DB) *GestorUsuarios {
 	return &GestorUsuarios{Db: db}
 }
 
-// Permite dar de alta un usuario administrativo en estado P: Pendiente controlando que
-// el nombre de usuario y el correo electrónico no existan ya, y sean obligatorios ambos campos.
-// Genera un token de sesión y un password aleatorios. Devuelve OK + Id o el mensaje de error
+// Permite dar de alta un usuario administrativo en estado P: Pendiente.
+// Genera una contraseña aleatoria que se devuelve para informar al usuario.
+// Al iniciar sesión por primera vez, deberá cambiar su contraseña y se activará.
+// Devuelve OK + Id + PasswordTemporal o el mensaje de error.
 // tsp_crear_usuario
 // - tokenSesion: token de sesión del usuario que realiza la operación
 // - usuario: nombre de usuario a crear
-// - email: correo electrónico del usuario a crear
-func (gu *GestorUsuarios) Crear(tokenSesion string, usuario string, email string) (string, int, error) {
+func (gu *GestorUsuarios) Crear(tokenSesion string, usuario string) (string, int, string, error) {
 	var mensaje string
-	var id *int
+	var id sql.NullInt64
+	var passwordTemporal sql.NullString
+	err := gu.Db.QueryRow("CALL tsp_crear_usuario(?, ?)", tokenSesion, usuario).Scan(&mensaje, &id, &passwordTemporal)
 
-	err := gu.Db.QueryRow("CALL tsp_crear_usuario(?, ?, ?)", tokenSesion, usuario, email).Scan(&mensaje, &id)
 	if err != nil {
-		return "", 0, err
+		return "", 0, "", err
 	}
 
-	if id == nil {
-		return mensaje, 0, nil
+	if !id.Valid {
+		return mensaje, 0, "", nil
 	}
 
-	return mensaje, *id, nil
+	return mensaje, int(id.Int64), passwordTemporal.String, nil
 }
 
 // Permite listar todos los usuarios que cumplan con la condición de búsqueda: la cadena debe estar
-// contenida en el nombre de usuario o en el email. Puede o no incluir los usuarios dados de baja
+// contenida en el nombre de usuario. Puede o no incluir los usuarios dados de baja
 // según pIncluyeBajas (S: Si - N: No). Ordena por nombre de usuario.
 // tsp_buscar_usuarios
 // - tokenSesion: token de sesión del usuario que realiza la operación
-// - cadena: cadena de búsqueda para filtrar por nombre de usuario o email
+// - cadena: cadena de búsqueda para filtrar por nombre de usuario
 // - incluyeBajas: S para incluir usuarios dados de baja, N para excluirlos
 func (gu *GestorUsuarios) Buscar(tokenSesion string, cadena string, incluyeBajas string) ([]*models.Usuarios, error) {
 	rows, err := gu.Db.Query("CALL tsp_buscar_usuarios(?, ?, ?)", tokenSesion, cadena, incluyeBajas)
@@ -54,7 +55,7 @@ func (gu *GestorUsuarios) Buscar(tokenSesion string, cadena string, incluyeBajas
 
 	for rows.Next() {
 		var m models.Usuarios
-		err = rows.Scan(&m.IdUsuario, &m.NombreUsuario, &m.Email, &m.Estado)
+		err = rows.Scan(&m.IdUsuario, &m.NombreUsuario, &m.Estado)
 		if err != nil {
 			return nil, err
 		}
@@ -73,20 +74,6 @@ func (gu *GestorUsuarios) Buscar(tokenSesion string, cadena string, incluyeBajas
 func (gu *GestorUsuarios) Borrar(tokenSesion string, idUsuario int) (string, error) {
 	var mensaje string
 	err := gu.Db.QueryRow("CALL tsp_borrar_usuario(?, ?)", tokenSesion, idUsuario).Scan(&mensaje)
-	if err != nil {
-		return "", err
-	}
-	return mensaje, nil
-}
-
-// Permite modificar el email del usuario logueado. El email es obligatorio y no debe existir ya.
-// Devuelve OK o el mensaje de error
-// tsp_modificar_usuario
-// - tokenSesion: token de sesión del usuario que realiza la operación
-// - email: nuevo correo electrónico del usuario
-func (gu *GestorUsuarios) Modificar(tokenSesion string, email string) (string, error) {
-	var mensaje string
-	err := gu.Db.QueryRow("CALL tsp_modificar_usuario(?, ?)", tokenSesion, email).Scan(&mensaje)
 	if err != nil {
 		return "", err
 	}
@@ -112,14 +99,14 @@ func (gu *GestorUsuarios) ModificarPassword(tokenSesion string, passwordAnterior
 }
 
 // Permite a un administrador logueado restablecer la contraseña de otro usuario.
-// Deja al usuario objetivo en estado pendiente y cambia la contraseña por una generada aleatoriamente.
-// Devuelve OK o el mensaje de error
+// Genera una contraseña temporal, deja al usuario en estado Pendiente y regenera su token.
+// Devuelve OK + PasswordTemporal o el mensaje de error.
 // tsp_restablecer_password_usuario
 // - tokenSesion: token de sesión del usuario que realiza la operación
-// - idUsuarioObjetivo: Id del usuario al que se le restablecerá la contraseña
-func (gu *GestorUsuarios) RestablecerPassword(tokenSesion string, idUsuarioObjetivo int) (string, error) {
+// - idUsuario: Id del usuario al que se le restablecerá la contraseña
+func (gu *GestorUsuarios) RestablecerPassword(tokenSesion string, idUsuario int) (string, error) {
 	var mensaje string
-	err := gu.Db.QueryRow("CALL tsp_restablecer_password_usuario(?, ?)", tokenSesion, idUsuarioObjetivo).Scan(&mensaje)
+	err := gu.Db.QueryRow("CALL tsp_restablecer_password_usuario(?, ?)", tokenSesion, idUsuario).Scan(&mensaje)
 	if err != nil {
 		return "", err
 	}
