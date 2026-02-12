@@ -2,14 +2,17 @@ package models
 
 import (
 	"MSTransaccionesFinancieras/internal/infra/persistence"
+	"database/sql"
 	"errors"
 )
 
 type Usuarios struct {
-	IdUsuario     int    `json:"id_usuario"`
-	NombreUsuario string `json:"nombre_usuario"`
-	TokenSesion   string `json:"token_sesion"`
-	Estado        string `json:"estado"`
+	IdUsuario              int    `json:"id_usuario"`
+	Usuario                string `json:"usuario"`
+	TokenSesion            string `json:"token_sesion"`
+	FechaAlta              string `json:"fecha_alta"`
+	Estado                 string `json:"estado"`
+	RequiereCambioPassword string `json:"requiere_cambio_password"`
 }
 
 // Instancia un usuario específico por su ID.
@@ -24,7 +27,7 @@ func (u *Usuarios) Dame(tokenSesion string) error {
 	defer rows.Close()
 
 	if rows.Next() {
-		return rows.Scan(&u.IdUsuario, &u.NombreUsuario, &u.Estado)
+		return rows.Scan(&u.IdUsuario, &u.Usuario, &u.FechaAlta, &u.Estado)
 	}
 
 	return nil
@@ -45,13 +48,48 @@ func (u *Usuarios) Login(usuario string, password string) (string, error) {
 	}
 	defer rows.Close()
 	var mensaje string
+	var usr sql.NullString
+	var fechaAlta sql.NullString
+	var tokenSesion sql.NullString
+	var requiereCambioPassword sql.NullString
+	var estado sql.NullString
 	if rows.Next() {
-		err = rows.Scan(&mensaje, &u.IdUsuario, &u.NombreUsuario, &u.TokenSesion)
+		err = rows.Scan(&mensaje, &u.IdUsuario, &usr, &tokenSesion, &requiereCambioPassword, &fechaAlta, &estado)
 		if err != nil {
 			return "", err
 		}
+		if usr.Valid {
+			u.Usuario = usr.String
+		} else {
+			u.Usuario = ""
+		}
+		if fechaAlta.Valid {
+			u.FechaAlta = fechaAlta.String
+		} else {
+			u.FechaAlta = ""
+		}
+		if tokenSesion.Valid {
+			u.TokenSesion = tokenSesion.String
+		} else {
+			u.TokenSesion = ""
+		}
+		if requiereCambioPassword.Valid {
+			if requiereCambioPassword.String == "S" {
+				mensaje += " - Se requiere cambio de contraseña temporal"
+			}
+			u.RequiereCambioPassword = requiereCambioPassword.String
+		} else {
+			u.RequiereCambioPassword = ""
+		}
+		if estado.Valid {
+			u.Estado = estado.String
+		} else {
+			u.Estado = ""
+		}
+
 		return mensaje, nil
 	}
+
 	return "", errors.New("Error al iniciar sesión: intente nuevamente o contacte al administrador")
 }
 
@@ -82,11 +120,11 @@ func (u *Usuarios) Desactivar(tokenSesion string) (string, error) {
 // Requiere haber iniciado sesión (tener token válido de tsp_login_usuario).
 // Devuelve OK o el mensaje de error
 // tsp_confirmar_cuenta_usuario
-// - idUsuario: Id del usuario a confirmar
+// - tokenSesion: token de sesión del usuario a confirmar
 // - password: contraseña hasheada con md5 que el usuario ingresa para confirmar su cuenta
 // - confirmarPassword: confirmación de la contraseña hasheada con md5 que el usuario ingresa para confirmar su cuenta
-func (u *Usuarios) ConfirmarCuenta(password string, confirmarPassword string) (string, error) {
+func (u *Usuarios) ConfirmarCuenta(tokenSesion string, password string, confirmarPassword string) (string, error) {
 	var mensaje string
-	err := persistence.ClienteMySQL.QueryRow("CALL tsp_confirmar_cuenta_usuario(?, ?, ?)", u.IdUsuario, password, confirmarPassword).Scan(&mensaje)
+	err := persistence.ClienteMySQL.QueryRow("CALL tsp_confirmar_cuenta_usuario(?, ?, ?)", tokenSesion, password, confirmarPassword).Scan(&mensaje)
 	return mensaje, err
 }

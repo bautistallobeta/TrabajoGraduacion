@@ -52,10 +52,9 @@ func (gu *GestorUsuarios) Buscar(tokenSesion string, cadena string, incluyeBajas
 	defer rows.Close()
 
 	var usuarios []*models.Usuarios
-
 	for rows.Next() {
 		var m models.Usuarios
-		err = rows.Scan(&m.IdUsuario, &m.NombreUsuario, &m.Estado)
+		err = rows.Scan(&m.IdUsuario, &m.Usuario, &m.FechaAlta, &m.Estado)
 		if err != nil {
 			return nil, err
 		}
@@ -104,11 +103,17 @@ func (gu *GestorUsuarios) ModificarPassword(tokenSesion string, passwordAnterior
 // tsp_restablecer_password_usuario
 // - tokenSesion: token de sesión del usuario que realiza la operación
 // - idUsuario: Id del usuario al que se le restablecerá la contraseña
-func (gu *GestorUsuarios) RestablecerPassword(tokenSesion string, idUsuario int) (string, error) {
+func (gu *GestorUsuarios) RestablecerPassword(tokenSesion string, idUsuario int) (string, string, error) {
 	var mensaje string
-	err := gu.Db.QueryRow("CALL tsp_restablecer_password_usuario(?, ?)", tokenSesion, idUsuario).Scan(&mensaje)
+	var passwordTemporal sql.NullString
+	err := gu.Db.QueryRow("CALL tsp_restablecer_password_usuario(?, ?)", tokenSesion, idUsuario).Scan(&mensaje, &passwordTemporal)
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
-	return mensaje, nil
+
+	if !passwordTemporal.Valid {
+		return mensaje, "", nil
+	}
+
+	return mensaje, passwordTemporal.String, nil
 }

@@ -1,7 +1,9 @@
 package utils
 
 import (
+	"crypto/md5"
 	"encoding/binary"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"math/big"
@@ -123,4 +125,11 @@ func UserData32AFecha(u uint32) (string, error) {
 func TimestampAFecha(timestamp uint64) string {
 	t := time.Unix(0, int64(timestamp)).UTC()
 	return t.Format("2006-01-02 15:04:05.999999999")
+}
+
+// Convierte string a hash md5
+func MD5Hash(text string) string {
+	hasher := md5.New()
+	hasher.Write([]byte(text))
+	return hex.EncodeToString(hasher.Sum(nil))
 }

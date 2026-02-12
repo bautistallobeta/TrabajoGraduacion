@@ -12,7 +12,7 @@ bin = "./tmp/mstf-app.exe"
 include_ext = ["go", "toml", "mod", "env"]
 exclude_dir = ["tmp", "vendor"]
 # Delay p cuando se guarda varias veces rápdido
-delay = 3000
+delay = 5000
 
 [log]
 #Muestra logs en teimpo real

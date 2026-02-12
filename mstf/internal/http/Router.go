@@ -55,6 +55,15 @@ func initRoutes(router *echo.Echo, notificador *webhook.Notificador) {
 	router.POST("/transferencias", transferenciasControlador.CrearTransferencia)
 
 	// Usuarios
+	router.GET("/usuarios/:id_usuario", usuariosControlador.Dame)
+	router.GET("/usuarios", usuariosControlador.Buscar)
 	router.POST("/usuarios", usuariosControlador.Crear)
+	router.POST("/usuarios/login", usuariosControlador.Login)
+	router.PUT("/usuarios/activar/:id_usuario", usuariosControlador.Activar)
+	router.PUT("/usuarios/desactivar/:id_usuario", usuariosControlador.Desactivar)
+	router.PUT("/usuarios/confirmar-cuenta/:id_usuario", usuariosControlador.ConfirmarCuenta)
+	router.PUT("/usuarios/password/modificar", usuariosControlador.ModificarPassword)
+	router.PUT("/usuarios/password/reestablecer", usuariosControlador.ReestablecerPassword)
+	router.DELETE("/usuarios/:id_usuario", usuariosControlador.Borrar)
 
 }
