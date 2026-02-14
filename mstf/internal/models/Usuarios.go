@@ -25,9 +25,33 @@ func (u *Usuarios) Dame(tokenSesion string) error {
 		return err
 	}
 	defer rows.Close()
-
+	var mensaje string
+	var usuario sql.NullString
+	var fechaAlta sql.NullString
+	var estado sql.NullString
 	if rows.Next() {
-		return rows.Scan(&u.IdUsuario, &u.Usuario, &u.FechaAlta, &u.Estado)
+		err = rows.Scan(&mensaje, &u.IdUsuario, &usuario, &fechaAlta, &estado)
+		if err != nil {
+			return err
+		}
+		if usuario.Valid {
+			u.Usuario = usuario.String
+		} else {
+			u.Usuario = ""
+		}
+		if fechaAlta.Valid {
+			u.FechaAlta = fechaAlta.String
+		} else {
+			u.FechaAlta = ""
+		}
+		if estado.Valid {
+			u.Estado = estado.String
+		} else {
+			u.Estado = ""
+		}
+	}
+	if mensaje != "OK" {
+		return errors.New(mensaje)
 	}
 
 	return nil
@@ -37,14 +61,14 @@ func (u *Usuarios) Dame(tokenSesion string) error {
 // Valida credenciales, regenera el token de sesión y devuelve los datos del usuario.
 // Si el usuario está Pendiente, permite login pero indica que debe cambiar contraseña.
 // pPassword debe venir ya hasheado con md5 desde el cliente.
-// Devuelve OK + datos del usuario o el mensaje de error
+// Devuelve OK + token o el mensaje de error
 // tsp_login_usuario
 // - usuario: nombre de usuario que intenta iniciar sesión
 // - password: contraseña hasheada con md5 del usuario que intenta iniciar sesión
-func (u *Usuarios) Login(usuario string, password string) (string, error) {
+func (u *Usuarios) Login(usuario string, password string) (string, string, error) {
 	rows, err := persistence.ClienteMySQL.Query("CALL tsp_login_usuario(?, ?)", usuario, password)
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 	defer rows.Close()
 	var mensaje string
@@ -56,7 +80,7 @@ func (u *Usuarios) Login(usuario string, password string) (string, error) {
 	if rows.Next() {
 		err = rows.Scan(&mensaje, &u.IdUsuario, &usr, &tokenSesion, &requiereCambioPassword, &fechaAlta, &estado)
 		if err != nil {
-			return "", err
+			return "", "", err
 		}
 		if usr.Valid {
 			u.Usuario = usr.String
@@ -87,10 +111,10 @@ func (u *Usuarios) Login(usuario string, password string) (string, error) {
 			u.Estado = ""
 		}
 
-		return mensaje, nil
+		return mensaje, u.TokenSesion, nil
 	}
 
-	return "", errors.New("Error al iniciar sesión: intente nuevamente o contacte al administrador")
+	return "", "", errors.New("Error: intente nuevamente o contacte al administrador")
 }
 
 // Permite cambiar el estado de un usuario a A: Activo siempre y cuando esté dado de baja.

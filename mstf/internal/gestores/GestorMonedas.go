@@ -1,9 +1,8 @@
 package gestores
 
 import (
-	"database/sql"
-
 	"MSTransaccionesFinancieras/internal/models"
+	"database/sql"
 )
 
 type GestorMonedas struct {
@@ -14,43 +13,53 @@ func NewGestorMonedas(db *sql.DB) *GestorMonedas {
 	return &GestorMonedas{Db: db}
 }
 
-// Da de alta una nueva moneda.
-// tsp_alta_moneda
-func (gm *GestorMonedas) Crear(tokenSesion string, idMoneda int, ledger int) (string, int, error) {
+// Crea una moneda en estado P: Pendiente y le asocia un ledger en TigerBeetle.
+// tsp_crear_moneda
+// - tokenSesion: token de sesión del usuario
+// - idMoneda: Id de la moneda a crear (viene de MisGastos)
+func (gm *GestorMonedas) Crear(tokenSesion string, idMoneda int) (string, error) {
 	var mensaje string
-	var id *int
-
-	err := gm.Db.QueryRow("CALL tsp_alta_moneda(?, ?, ?)", tokenSesion, idMoneda, ledger).Scan(&mensaje, &id)
+	err := gm.Db.QueryRow("CALL tsp_crear_moneda(?, ?)", tokenSesion, idMoneda).Scan(&mensaje)
 	if err != nil {
-		return "", 0, err
+		return "", err
 	}
-
-	if id == nil {
-		return mensaje, 0, nil
-	}
-
-	return mensaje, *id, nil
+	return mensaje, nil
 }
 
-// Lista las monedas.
-// tsp_buscar_monedas
-func (gm *GestorMonedas) Buscar(tokenSesion string, incluyeBajas string) ([]*models.Monedas, error) {
-	rows, err := gm.Db.Query("CALL tsp_buscar_monedas(?, ?)", tokenSesion, incluyeBajas)
+//	Permite listar todas las monedas. Si pIncluyeInactivas es 'S', muestra todas.
+//
+// Si es 'N', muestra solo las activas. Ordena por IdMoneda.
+// tsp_listar_monedas
+// - tokenSesion: token de sesión del usuario
+// - incluyeBajas: 'S' o 'N' para incluir o no las monedas bajas
+func (gm *GestorMonedas) Listar(tokenSesion string, incluyeBajas string) ([]models.Monedas, error) {
+	rows, err := gm.Db.Query("CALL tsp_listar_monedas(?, ?)", tokenSesion, incluyeBajas)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 
-	var monedas []*models.Monedas
-
+	var monedas []models.Monedas
 	for rows.Next() {
 		var m models.Monedas
-		err = rows.Scan(&m.IdMoneda, &m.Ledger, &m.Estado, &m.FechaAlta)
+		err = rows.Scan(&m.IdMoneda, &m.Ledger, &m.IdCuentaEmpresa, &m.Estado, &m.FechaAlta)
 		if err != nil {
 			return nil, err
 		}
-		monedas = append(monedas, &m)
+		monedas = append(monedas, m)
 	}
-
 	return monedas, nil
+}
+
+// Borra una moneda únicamente si está en estado pendiente.
+// tsp_borrar_moneda
+// - tokenSesion: token de sesión del usuario
+// - idMoneda: Id de la moneda a borrar
+func (gm *GestorMonedas) Borrar(tokenSesion string, idMoneda int) (string, error) {
+	var mensaje string
+	err := gm.Db.QueryRow("CALL tsp_borrar_moneda(?, ?)", tokenSesion, idMoneda).Scan(&mensaje)
+	if err != nil {
+		return "", err
+	}
+	return mensaje, nil
 }

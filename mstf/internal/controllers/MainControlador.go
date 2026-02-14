@@ -12,6 +12,6 @@ func NewMainControlador() *MainControlador {
 	return &MainControlador{}
 }
 
-func (mc *MainControlador) Hola(c echo.Context) error {
+func (mc *MainControlador) Ping(c echo.Context) error {
 	return c.String(http.StatusOK, "Hola Mundo desde API MSTF.")
 }

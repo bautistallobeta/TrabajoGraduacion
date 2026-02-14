@@ -161,14 +161,14 @@ func (uc *UsuariosControlador) Login(c echo.Context) error {
 		return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta("Usuario y Password son campos obligatorios"))
 	}
 	usuario := &models.Usuarios{}
-	mensaje, err := usuario.Login(req.Usuario, utils.MD5Hash(req.Password))
+	mensaje, tokenSesion, err := usuario.Login(req.Usuario, utils.MD5Hash(req.Password))
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, models.NewErrorRespuesta("Error al iniciar sesión: "+err.Error()))
 	}
 	if mensaje != "OK" {
 		return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta(mensaje))
 	}
-	return c.JSON(http.StatusOK, usuario)
+	return c.JSON(http.StatusOK, map[string]string{"mensaje": mensaje, "tokenSesion": tokenSesion})
 }
 
 func (uc *UsuariosControlador) Activar(c echo.Context) error {

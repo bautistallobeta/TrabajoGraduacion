@@ -42,7 +42,7 @@ func initRoutes(router *echo.Echo, notificador *webhook.Notificador) {
 	usuariosControlador := controllers.NewUsuariosControlador(gestorUsuarios)
 
 	// Endpoint de prueba
-	router.GET("/hola", mainControlador.Hola)
+	router.GET("/ping", mainControlador.Ping)
 
 	// Cuentas
 	router.GET("/cuentas/:id_cuenta/historial", cuentasControlador.DameHistorialCuenta)

@@ -1,46 +1,117 @@
 package models
 
 import (
-	"time"
-
 	"MSTransaccionesFinancieras/internal/infra/persistence"
+	"database/sql"
+	"errors"
+	"time"
 )
 
 type Monedas struct {
-	IdMoneda  int       `json:"IdMoneda"`
-	Ledger    int       `json:"Ledger"`
-	Estado    string    `json:"Estado"`
-	FechaAlta time.Time `json:"FechaAlta"`
+	IdMoneda        int            `json:"IdMoneda"`
+	Ledger          int            `json:"Ledger"`
+	IdCuentaEmpresa sql.NullString `json:"IdCuentaEmpresa"`
+	Estado          string         `json:"Estado"`
+	FechaAlta       time.Time      `json:"FechaAlta"`
 }
 
 // Instancia los atributos de la moneda desde la base de datos.
 // tsp_dame_moneda
-func (m *Monedas) Dame(tokenSesion string) error {
-	rows, err := persistence.ClienteMySQL.Query("CALL tsp_dame_moneda(?, ?)", tokenSesion, m.IdMoneda)
+// - tokenSesion: token de sesión del usuario
+func (m *Monedas) Dame(db *sql.DB, tokenSesion string) (string, error) {
+	rows, err := persistence.ClienteMySQL.Query("CALL tsp_dame_moneda(?)", tokenSesion)
 	if err != nil {
-		return err
+		return "", err
 	}
 	defer rows.Close()
-
+	var mensaje string
+	var idMoneda sql.NullInt32
+	var ledger sql.NullInt32
+	var estado sql.NullString
+	var fechaAlta sql.NullTime
 	if rows.Next() {
-		return rows.Scan(&m.IdMoneda, &m.Ledger, &m.Estado, &m.FechaAlta)
+		err = rows.Scan(&mensaje, &idMoneda, &ledger, &m.IdCuentaEmpresa, &estado, &fechaAlta)
+
+		if idMoneda.Valid {
+			m.IdMoneda = int(idMoneda.Int32)
+		} else {
+			m.IdMoneda = 0
+		}
+		if fechaAlta.Valid {
+			m.FechaAlta = fechaAlta.Time
+		} else {
+			m.FechaAlta = time.Time{}
+		}
+		if estado.Valid {
+			m.Estado = estado.String
+		} else {
+			m.Estado = ""
+		}
+		if err != nil {
+			return mensaje, err
+		}
+		if mensaje != "OK" {
+			return mensaje, errors.New(mensaje)
+		}
+	}
+	return mensaje, nil
+}
+
+// Instancia los atributos de la moneda desde la base de datos a partir de su ledger.
+// tsp_dame_moneda_por_ledger
+// - tokenSesion: token de sesión del usuario
+// - ledger: ledger de TigerBeetle
+func (m *Monedas) DamePorLedger(db *sql.DB, tokenSesion string, ledger int) (string, error) {
+	var idMoneda sql.NullInt32
+	var mensaje string
+	var estado sql.NullString
+	var fechaAlta sql.NullTime
+	err := db.QueryRow("CALL tsp_dame_moneda_por_ledger(?, ?)", tokenSesion, ledger).Scan(&mensaje, &idMoneda, &m.Ledger, &m.IdCuentaEmpresa, &estado, &fechaAlta)
+	if err != nil {
+		return "", err
+	}
+	if mensaje != "OK" {
+		return mensaje, errors.New(mensaje)
+	}
+	if idMoneda.Valid {
+		m.IdMoneda = int(idMoneda.Int32)
+	} else {
+		m.IdMoneda = 0
+	}
+	if estado.Valid {
+		m.Estado = estado.String
+	} else {
+		m.Estado = ""
+	}
+	if fechaAlta.Valid {
+		m.FechaAlta = fechaAlta.Time
+	} else {
+		m.FechaAlta = time.Time{}
 	}
 
-	return nil
+	return mensaje, nil
 }
 
-// Cambia el estado de la moneda a baja.
-// tsp_darbaja_moneda
-func (m *Monedas) DarBaja(tokenSesion string) (string, error) {
-	var mensaje string
-	err := persistence.ClienteMySQL.QueryRow("CALL tsp_darbaja_moneda(?, ?)", tokenSesion, m.IdMoneda).Scan(&mensaje)
-	return mensaje, err
-}
-
-// Cambia el estado de la moneda a activa.
+// Activa una moneda pendiente asignando la cuenta empresa.
 // tsp_activar_moneda
-func (m *Monedas) Activar(tokenSesion string) (string, error) {
+// - idCuentaEmpresa: Id de la cuenta empresa en TigerBeetle
+func (m *Monedas) Activar(db *sql.DB, idCuentaEmpresa string) (string, error) {
 	var mensaje string
-	err := persistence.ClienteMySQL.QueryRow("CALL tsp_activar_moneda(?, ?)", tokenSesion, m.IdMoneda).Scan(&mensaje)
-	return mensaje, err
+	err := db.QueryRow("CALL tsp_activar_moneda(?, ?)", idCuentaEmpresa, m.IdMoneda).Scan(&mensaje)
+	if err != nil {
+		return "", err
+	}
+	return mensaje, nil
+}
+
+// Desactiva una moneda activa.
+// tsp_desactivar_moneda
+// - tokenSesion: token de sesión del usuario
+func (m *Monedas) Desactivar(db *sql.DB, tokenSesion string) (string, error) {
+	var mensaje string
+	err := db.QueryRow("CALL tsp_desactivar_moneda(?, ?)", tokenSesion, m.IdMoneda).Scan(&mensaje)
+	if err != nil {
+		return "", err
+	}
+	return mensaje, nil
 }
