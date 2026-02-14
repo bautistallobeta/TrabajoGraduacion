@@ -40,6 +40,7 @@ func initRoutes(router *echo.Echo, notificador *webhook.Notificador) {
 	transferenciasControlador := controllers.NewTransferenciasControlador(gestorTransferencias, productorKafka)
 	gestorUsuarios := gestores.NewGestorUsuarios(persistence.ClienteMySQL)
 	usuariosControlador := controllers.NewUsuariosControlador(gestorUsuarios)
+	paramControlador := controllers.NewParametrosControlador()
 
 	// Endpoint de prueba
 	router.GET("/ping", mainControlador.Ping)
@@ -61,9 +62,14 @@ func initRoutes(router *echo.Echo, notificador *webhook.Notificador) {
 	router.POST("/usuarios/login", usuariosControlador.Login)
 	router.PUT("/usuarios/activar/:id_usuario", usuariosControlador.Activar)
 	router.PUT("/usuarios/desactivar/:id_usuario", usuariosControlador.Desactivar)
-	router.PUT("/usuarios/confirmar-cuenta/:id_usuario", usuariosControlador.ConfirmarCuenta)
+	router.PUT("/usuarios/confirmar-cuenta/:id_usuario", usuariosControlador.ConfirmarUsuario)
 	router.PUT("/usuarios/password/modificar", usuariosControlador.ModificarPassword)
 	router.PUT("/usuarios/password/reestablecer", usuariosControlador.ReestablecerPassword)
 	router.DELETE("/usuarios/:id_usuario", usuariosControlador.Borrar)
+
+	// Parámetros
+	router.GET("/parametros/:parametro", paramControlador.Dame)
+	router.GET("/parametros", paramControlador.Buscar)
+	router.PUT("/parametros/:parametro", paramControlador.Modificar)
 
 }

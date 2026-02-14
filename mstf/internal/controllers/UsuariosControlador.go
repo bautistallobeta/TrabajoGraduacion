@@ -125,7 +125,7 @@ func (uc *UsuariosControlador) ReestablecerPassword(c echo.Context) error {
 	if mensaje != "OK" {
 		return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta(mensaje))
 	}
-	return c.JSON(http.StatusOK, map[string]string{"mensaje": mensaje, "passwordTemporal": passTemporal})
+	return c.JSON(http.StatusOK, map[string]string{"passwordTemporal": passTemporal})
 }
 
 func (uc *UsuariosControlador) Dame(c echo.Context) error {
@@ -220,7 +220,7 @@ func (uc *UsuariosControlador) Desactivar(c echo.Context) error {
 	return c.JSON(http.StatusOK, map[string]string{"mensaje": mensaje})
 }
 
-func (uc *UsuariosControlador) ConfirmarCuenta(c echo.Context) error {
+func (uc *UsuariosControlador) ConfirmarUsuario(c echo.Context) error {
 	type Request struct {
 		IdUsuario         int    `param:"id_usuario"`
 		Password          string `json:"password"`

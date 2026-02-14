@@ -83,11 +83,10 @@ func (p *Parametros) BuscarParametros(tokenSesion string, cadena string) ([]Para
 // Devuelve OK o el mensaje de error en Mensaje.
 // tsp_modificar_parametro
 // - tokenSesion: token de sesión del usuario
-// - parametro: clave del parámetro a modificar
 // - valor: nuevo valor del parámetro
-func (p *Parametros) ModificarParametro(tokenSesion string) (string, error) {
+func (p *Parametros) ModificarParametro(tokenSesion string, valor string) (string, error) {
 	var mensaje string
-	err := persistence.ClienteMySQL.QueryRow("CALL tsp_modificar_parametro(?, ?, ?)", tokenSesion, p.Parametro, p.Valor).Scan(&mensaje)
+	err := persistence.ClienteMySQL.QueryRow("CALL tsp_modificar_parametro(?, ?, ?)", tokenSesion, p.Parametro, valor).Scan(&mensaje)
 	if err != nil {
 		return "", err
 	}
