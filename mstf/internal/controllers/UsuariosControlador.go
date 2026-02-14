@@ -141,11 +141,14 @@ func (uc *UsuariosControlador) Dame(c echo.Context) error {
 		return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta("IdUsuario es campo obligatorio"))
 	}
 	usuario := &models.Usuarios{IdUsuario: req.IdUsuario}
-	err := usuario.Dame(tokenSesion)
+	mensaje, err := usuario.Dame(tokenSesion)
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, models.NewErrorRespuesta("Error al obtener usuario: "+err.Error()))
 	}
-	return c.JSON(http.StatusOK, usuario)
+	if mensaje != "OK" {
+		return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta(mensaje))
+	}
+	return c.JSON(http.StatusOK, map[string]interface{}{"mensaje": mensaje, "usuario": usuario})
 }
 
 func (uc *UsuariosControlador) Login(c echo.Context) error {

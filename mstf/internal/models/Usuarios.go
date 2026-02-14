@@ -19,10 +19,10 @@ type Usuarios struct {
 // tsp_dame_usuario
 // - tokenSesion: token de sesión del usuario que realiza la operación
 // - idUsuario: Id del usuario a instanciar
-func (u *Usuarios) Dame(tokenSesion string) error {
+func (u *Usuarios) Dame(tokenSesion string) (string, error) {
 	rows, err := persistence.ClienteMySQL.Query("CALL tsp_dame_usuario(?, ?)", tokenSesion, u.IdUsuario)
 	if err != nil {
-		return err
+		return "", err
 	}
 	defer rows.Close()
 	var mensaje string
@@ -32,7 +32,7 @@ func (u *Usuarios) Dame(tokenSesion string) error {
 	if rows.Next() {
 		err = rows.Scan(&mensaje, &u.IdUsuario, &usuario, &fechaAlta, &estado)
 		if err != nil {
-			return err
+			return mensaje, err
 		}
 		if usuario.Valid {
 			u.Usuario = usuario.String
@@ -51,10 +51,10 @@ func (u *Usuarios) Dame(tokenSesion string) error {
 		}
 	}
 	if mensaje != "OK" {
-		return errors.New(mensaje)
+		return mensaje, errors.New(mensaje)
 	}
 
-	return nil
+	return mensaje, nil
 }
 
 // Permite a un usuario iniciar sesión en el sistema administrativo de MSTF.
