@@ -1,16 +1,16 @@
 package gestores
 
 import (
+	"MSTransaccionesFinancieras/internal/infra/persistence"
 	"MSTransaccionesFinancieras/internal/models"
 	"database/sql"
 )
 
 type GestorUsuarios struct {
-	Db *sql.DB
 }
 
-func NewGestorUsuarios(db *sql.DB) *GestorUsuarios {
-	return &GestorUsuarios{Db: db}
+func NewGestorUsuarios() *GestorUsuarios {
+	return &GestorUsuarios{}
 }
 
 // Permite dar de alta un usuario administrativo en estado P: Pendiente.
@@ -24,7 +24,7 @@ func (gu *GestorUsuarios) Crear(tokenSesion string, usuario string) (string, int
 	var mensaje string
 	var id sql.NullInt64
 	var passwordTemporal sql.NullString
-	err := gu.Db.QueryRow("CALL tsp_crear_usuario(?, ?)", tokenSesion, usuario).Scan(&mensaje, &id, &passwordTemporal)
+	err := persistence.ClienteMySQL.QueryRow("CALL tsp_crear_usuario(?, ?)", tokenSesion, usuario).Scan(&mensaje, &id, &passwordTemporal)
 
 	if err != nil {
 		return "", 0, "", err
@@ -45,7 +45,7 @@ func (gu *GestorUsuarios) Crear(tokenSesion string, usuario string) (string, int
 // - cadena: cadena de búsqueda para filtrar por nombre de usuario
 // - incluyeBajas: S para incluir usuarios dados de baja, N para excluirlos
 func (gu *GestorUsuarios) Buscar(tokenSesion string, cadena string, incluyeBajas string) ([]*models.Usuarios, error) {
-	rows, err := gu.Db.Query("CALL tsp_buscar_usuarios(?, ?, ?)", tokenSesion, cadena, incluyeBajas)
+	rows, err := persistence.ClienteMySQL.Query("CALL tsp_buscar_usuarios(?, ?, ?)", tokenSesion, cadena, incluyeBajas)
 	if err != nil {
 		return nil, err
 	}
@@ -72,7 +72,7 @@ func (gu *GestorUsuarios) Buscar(tokenSesion string, cadena string, incluyeBajas
 // - idUsuario: Id del usuario a eliminar
 func (gu *GestorUsuarios) Borrar(tokenSesion string, idUsuario int) (string, error) {
 	var mensaje string
-	err := gu.Db.QueryRow("CALL tsp_borrar_usuario(?, ?)", tokenSesion, idUsuario).Scan(&mensaje)
+	err := persistence.ClienteMySQL.QueryRow("CALL tsp_borrar_usuario(?, ?)", tokenSesion, idUsuario).Scan(&mensaje)
 	if err != nil {
 		return "", err
 	}
@@ -90,7 +90,7 @@ func (gu *GestorUsuarios) Borrar(tokenSesion string, idUsuario int) (string, err
 // - confirmarPassword: confirmación de la nueva contraseña hasheada con md5
 func (gu *GestorUsuarios) ModificarPassword(tokenSesion string, passwordAnterior string, passwordNuevo string, confirmarPassword string) (string, error) {
 	var mensaje string
-	err := gu.Db.QueryRow("CALL tsp_modificar_password_usuario(?, ?, ?, ?)", tokenSesion, passwordAnterior, passwordNuevo, confirmarPassword).Scan(&mensaje)
+	err := persistence.ClienteMySQL.QueryRow("CALL tsp_modificar_password_usuario(?, ?, ?, ?)", tokenSesion, passwordAnterior, passwordNuevo, confirmarPassword).Scan(&mensaje)
 	if err != nil {
 		return "", err
 	}
@@ -106,7 +106,7 @@ func (gu *GestorUsuarios) ModificarPassword(tokenSesion string, passwordAnterior
 func (gu *GestorUsuarios) RestablecerPassword(tokenSesion string, idUsuario int) (string, string, error) {
 	var mensaje string
 	var passwordTemporal sql.NullString
-	err := gu.Db.QueryRow("CALL tsp_restablecer_password_usuario(?, ?)", tokenSesion, idUsuario).Scan(&mensaje, &passwordTemporal)
+	err := persistence.ClienteMySQL.QueryRow("CALL tsp_restablecer_password_usuario(?, ?)", tokenSesion, idUsuario).Scan(&mensaje, &passwordTemporal)
 	if err != nil {
 		return "", "", err
 	}

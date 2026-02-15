@@ -8,7 +8,6 @@ import (
 	"MSTransaccionesFinancieras/internal/gestores"
 	httpMiddleware "MSTransaccionesFinancieras/internal/http/middlewares"
 	"MSTransaccionesFinancieras/internal/infra/kafkamstf"
-	"MSTransaccionesFinancieras/internal/infra/persistence"
 	"MSTransaccionesFinancieras/internal/infra/webhook"
 )
 
@@ -32,40 +31,40 @@ func InitRouter(notificador *webhook.Notificador, productor *kafkamstf.Productor
 func initRoutes(router *echo.Echo, notificador *webhook.Notificador, productor *kafkamstf.ProductorKafka) {
 	// Inicializac de controladores
 	mainControlador := controllers.NewMainControlador()
-	gestorCuentas := gestores.NewGestorCuentas(persistence.ClienteTB)
-	gestorTransferencias := gestores.NewGestorTransferencias(persistence.ClienteTB, notificador)
+	gestorCuentas := gestores.NewGestorCuentas()
+	gestorTransferencias := gestores.NewGestorTransferencias(notificador)
 	cuentasControlador := controllers.NewCuentasControlador(gestorCuentas)
 	transferenciasControlador := controllers.NewTransferenciasControlador(gestorTransferencias, productor)
-	gestorUsuarios := gestores.NewGestorUsuarios(persistence.ClienteMySQL)
+	gestorUsuarios := gestores.NewGestorUsuarios()
 	usuariosControlador := controllers.NewUsuariosControlador(gestorUsuarios)
 	paramControlador := controllers.NewParametrosControlador()
-	gestorMonedas := gestores.NewGestorMonedas(persistence.ClienteMySQL)
+	gestorMonedas := gestores.NewGestorMonedas()
 	monedasControlador := controllers.NewMonedasControlador(gestorMonedas)
 
 	// Endpoint de prueba
 	router.GET("/ping", mainControlador.Ping)
 
 	// Cuentas
-	router.GET("/cuentas/:id_cuenta/historial", cuentasControlador.DameHistorial)
-	router.GET("/cuentas/:id_cuenta", cuentasControlador.Dame)
+	router.GET("/cuentas/:idcuenta/historial", cuentasControlador.DameHistorial)
+	router.GET("/cuentas/:idcuenta", cuentasControlador.Dame)
 	router.POST("/cuentas", cuentasControlador.Crear)
 	router.GET("/cuentas", cuentasControlador.Buscar)
 
 	//Transferencias
-	router.GET("/transferencias/:id_transferencia", transferenciasControlador.Dame)
+	router.GET("/transferencias/:idtransferencia", transferenciasControlador.Dame)
 	router.POST("/transferencias", transferenciasControlador.Crear)
 
 	// Usuarios
-	router.GET("/usuarios/:id_usuario", usuariosControlador.Dame)
+	router.GET("/usuarios/:idusuario", usuariosControlador.Dame)
 	router.GET("/usuarios", usuariosControlador.Buscar)
 	router.POST("/usuarios", usuariosControlador.Crear)
 	router.POST("/usuarios/login", usuariosControlador.Login)
-	router.PUT("/usuarios/activar/:id_usuario", usuariosControlador.Activar)
-	router.PUT("/usuarios/desactivar/:id_usuario", usuariosControlador.Desactivar)
-	router.PUT("/usuarios/confirmar-cuenta/:id_usuario", usuariosControlador.ConfirmarUsuario)
+	router.PUT("/usuarios/activar/:idusuario", usuariosControlador.Activar)
+	router.PUT("/usuarios/desactivar/:idusuario", usuariosControlador.Desactivar)
+	router.PUT("/usuarios/confirmar-cuenta/:idusuario", usuariosControlador.ConfirmarUsuario)
 	router.PUT("/usuarios/password/modificar", usuariosControlador.ModificarPassword)
 	router.PUT("/usuarios/password/reestablecer", usuariosControlador.ReestablecerPassword)
-	router.DELETE("/usuarios/:id_usuario", usuariosControlador.Borrar)
+	router.DELETE("/usuarios/:idusuario", usuariosControlador.Borrar)
 
 	// Parámetros
 	router.GET("/parametros/:parametro", paramControlador.Dame)
@@ -73,10 +72,10 @@ func initRoutes(router *echo.Echo, notificador *webhook.Notificador, productor *
 	router.PUT("/parametros/:parametro", paramControlador.Modificar)
 
 	// Monedas
-	router.GET("/monedas/:id_moneda", monedasControlador.Dame)
+	router.GET("/monedas/:idmoneda", monedasControlador.Dame)
 	router.POST("/monedas", monedasControlador.Crear)
-	router.DELETE("/monedas/:id_moneda", monedasControlador.Borrar)
+	router.DELETE("/monedas/:idmoneda", monedasControlador.Borrar)
 	router.GET("/monedas", monedasControlador.Listar)
-	router.PUT("/monedas/:id_moneda/desactivar", monedasControlador.Desctivar)
+	router.PUT("/monedas/:idmoneda/desactivar", monedasControlador.Desctivar)
 
 }

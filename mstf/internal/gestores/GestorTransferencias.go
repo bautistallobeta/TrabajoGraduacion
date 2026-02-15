@@ -1,34 +1,32 @@
 package gestores
 
 import (
+	"MSTransaccionesFinancieras/internal/infra/persistence"
 	"MSTransaccionesFinancieras/internal/infra/webhook"
 	"MSTransaccionesFinancieras/internal/utils"
 	"errors"
 	"log"
 
-	tigerbeetle "github.com/tigerbeetle/tigerbeetle-go"
 	"github.com/tigerbeetle/tigerbeetle-go/pkg/types"
 )
 
 type GestorTransferencias struct {
-	tbClient    tigerbeetle.Client
 	notificador *webhook.Notificador
 }
 
-func NewGestorTransferencias(tbClient tigerbeetle.Client, notificador *webhook.Notificador) *GestorTransferencias {
+func NewGestorTransferencias(notificador *webhook.Notificador) *GestorTransferencias {
 	return &GestorTransferencias{
-		tbClient:    tbClient,
 		notificador: notificador,
 	}
 }
 
 // Lógica de negocio que se ejecuta al recibir un lote del consumidor. TODO: agregar comentario completo
 func (gt *GestorTransferencias) ProcesarLote(batch []types.Transfer) error {
-	if gt.tbClient == nil {
+	if persistence.ClienteTB == nil {
 		return errors.New("Conexión a TigerBeetle no inicializada")
 	}
 
-	results, err := gt.tbClient.CreateTransfers(batch)
+	results, err := persistence.ClienteTB.CreateTransfers(batch)
 	if err != nil {
 		log.Printf("ERROR [GestorTransferencias.ProcesarLote]: Error de comunicación con TigerBeetle al enviar batch de %d transfers: %v", len(batch), err)
 		return err

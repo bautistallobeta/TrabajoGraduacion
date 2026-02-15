@@ -1,16 +1,17 @@
 package gestores
 
 import (
+	"MSTransaccionesFinancieras/internal/infra/persistence"
 	"MSTransaccionesFinancieras/internal/models"
-	"database/sql"
+	"log"
+	"strconv"
 )
 
 type GestorMonedas struct {
-	Db *sql.DB
 }
 
-func NewGestorMonedas(db *sql.DB) *GestorMonedas {
-	return &GestorMonedas{Db: db}
+func NewGestorMonedas() *GestorMonedas {
+	return &GestorMonedas{}
 }
 
 // Crea una moneda en estado P: Pendiente.
@@ -19,7 +20,7 @@ func NewGestorMonedas(db *sql.DB) *GestorMonedas {
 // - idMoneda: Id de la moneda a crear (viene de MisGastos)
 func (gm *GestorMonedas) Crear(tokenSesion string, idMoneda int) (string, error) {
 	var mensaje string
-	err := gm.Db.QueryRow("CALL tsp_crear_moneda(?, ?)", tokenSesion, idMoneda).Scan(&mensaje)
+	err := persistence.ClienteMySQL.QueryRow("CALL tsp_crear_moneda(?, ?)", tokenSesion, idMoneda).Scan(&mensaje)
 	if err != nil {
 		return "", err
 	}
@@ -33,7 +34,7 @@ func (gm *GestorMonedas) Crear(tokenSesion string, idMoneda int) (string, error)
 // - tokenSesion: token de sesión del usuario
 // - incluyeBajas: 'S' o 'N' para incluir o no las monedas bajas
 func (gm *GestorMonedas) Listar(tokenSesion string, incluyeBajas string) ([]models.Monedas, error) {
-	rows, err := gm.Db.Query("CALL tsp_listar_monedas(?, ?)", tokenSesion, incluyeBajas)
+	rows, err := persistence.ClienteMySQL.Query("CALL tsp_listar_monedas(?, ?)", tokenSesion, incluyeBajas)
 	if err != nil {
 		return nil, err
 	}
@@ -57,9 +58,11 @@ func (gm *GestorMonedas) Listar(tokenSesion string, incluyeBajas string) ([]mode
 // - idMoneda: Id de la moneda a borrar
 func (gm *GestorMonedas) Borrar(tokenSesion string, idMoneda int) (string, error) {
 	var mensaje string
-	err := gm.Db.QueryRow("CALL tsp_borrar_moneda(?, ?)", tokenSesion, idMoneda).Scan(&mensaje)
+	err := persistence.ClienteMySQL.QueryRow("CALL tsp_borrar_moneda(?, ?)", tokenSesion, idMoneda).Scan(&mensaje)
 	if err != nil {
 		return "", err
 	}
+	models.CacheMonedas.Borrar(strconv.Itoa(idMoneda))
+	log.Printf("[CACHE INVALIDADO] Moneda %d borrada del caché por eliminación", idMoneda)
 	return mensaje, nil
 }

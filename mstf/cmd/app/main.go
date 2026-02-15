@@ -75,7 +75,7 @@ func main() {
 	notificador := webhook.NewNotificador(cfg)
 
 	// Gestor de Transferencias
-	gestorTransferencias := gestores.NewGestorTransferencias(persistence.ClienteTB, notificador)
+	gestorTransferencias := gestores.NewGestorTransferencias(notificador)
 
 	// Consumidor Kafka
 	consumidor := kafkamstf.NewConsumidor(cfg, gestorTransferencias)

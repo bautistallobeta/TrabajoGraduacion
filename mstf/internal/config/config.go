@@ -51,7 +51,7 @@ func Load() Config {
 	//  Kafka
 	kafkaBrokerStr := mustGetEnv("KAFKA_BROKERS", "")
 	cfg.BrokersKafka = strings.Split(kafkaBrokerStr, ",")
-	cfg.TopicKafka = mustGetEnv("KAFKA_TOPIC", "")
+	cfg.TopicKafka = mustGetEnv("KAFKA_TOPIC_TRANSFERS", "")
 	cfg.GroupIDKafka = mustGetEnv("KAFKA_GROUP_ID", "")
 	cfg.TamanoLoteKafka = mustGetEnvInt("KAFKA_BATCH_SIZE", 1000)
 	cfg.TimeoutLoteKafka = time.Duration(mustGetEnvInt("KAFKA_BATCH_TIMEOUT_MS", 20000)) * time.Millisecond

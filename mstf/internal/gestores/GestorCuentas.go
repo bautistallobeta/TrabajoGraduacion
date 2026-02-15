@@ -7,14 +7,13 @@ import (
 	"errors"
 	"log"
 
-	tigerbeetle "github.com/tigerbeetle/tigerbeetle-go"
 	"github.com/tigerbeetle/tigerbeetle-go/pkg/types"
 )
 
 type GestorCuentas struct {
 }
 
-func NewGestorCuentas(tbClient tigerbeetle.Client) *GestorCuentas {
+func NewGestorCuentas() *GestorCuentas {
 	return &GestorCuentas{}
 }
 
