@@ -25,7 +25,7 @@ func NewGestorTransferencias(tbClient tigerbeetle.Client, notificador *webhook.N
 // Lógica de negocio que se ejecuta al recibir un lote del consumidor. TODO: agregar comentario completo
 func (gt *GestorTransferencias) ProcesarLote(batch []types.Transfer) error {
 	if gt.tbClient == nil {
-		return errors.New("conexión a TigerBeetle no inicializada en GestorTransferencias")
+		return errors.New("Conexión a TigerBeetle no inicializada")
 	}
 
 	results, err := gt.tbClient.CreateTransfers(batch)

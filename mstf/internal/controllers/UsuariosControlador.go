@@ -19,7 +19,7 @@ func NewUsuariosControlador(gu *gestores.GestorUsuarios) *UsuariosControlador {
 
 func (uc *UsuariosControlador) Crear(c echo.Context) error {
 	type Request struct {
-		Usuario string `json:"usuario"`
+		Usuario string `json:"Usuario"`
 	}
 	tokenSesion, _ := c.Get("adminToken").(string)
 	req := &Request{}
@@ -37,7 +37,7 @@ func (uc *UsuariosControlador) Crear(c echo.Context) error {
 	if id == 0 {
 		return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta(mensaje))
 	}
-	return c.JSON(http.StatusOK, map[string]interface{}{"id": id, "passwordTemporal": passTemporal})
+	return c.JSON(http.StatusOK, map[string]interface{}{"Id": id, "PasswordTemporal": passTemporal})
 }
 
 func (uc *UsuariosControlador) Buscar(c echo.Context) error {
@@ -50,7 +50,9 @@ func (uc *UsuariosControlador) Buscar(c echo.Context) error {
 	if err := c.Bind(req); err != nil {
 		return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta("Parámetros inválidos: "+err.Error()))
 	}
-	if req.IncluyeBajas != "S" && req.IncluyeBajas != "N" {
+	if req.IncluyeBajas == "" {
+		req.IncluyeBajas = "N"
+	} else if req.IncluyeBajas != "S" && req.IncluyeBajas != "N" {
 		return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta("IncluyeBajas debe ser 'S' o 'N'"))
 	}
 	usuarios, err := uc.Gestor.Buscar(tokenSesion, req.Cadena, req.IncluyeBajas)
@@ -76,14 +78,14 @@ func (uc *UsuariosControlador) Borrar(c echo.Context) error {
 	if mensaje != "OK" {
 		return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta(mensaje))
 	}
-	return c.JSON(http.StatusOK, map[string]string{"mensaje": mensaje})
+	return c.JSON(http.StatusOK, map[string]string{"Mensaje": mensaje})
 }
 
 func (uc *UsuariosControlador) ModificarPassword(c echo.Context) error {
 	type Request struct {
-		PasswordAnterior  string `json:"password_anterior"`
-		PasswordNuevo     string `json:"password_nuevo"`
-		ConfirmarPassword string `json:"confirmar_password"`
+		PasswordAnterior  string `json:"PasswordAnterior"`
+		PasswordNuevo     string `json:"PasswordNuevo"`
+		ConfirmarPassword string `json:"ConfirmarPassword"`
 	}
 	tokenSesion, _ := c.Get("adminToken").(string)
 	req := &Request{}
@@ -103,12 +105,12 @@ func (uc *UsuariosControlador) ModificarPassword(c echo.Context) error {
 	if mensaje != "OK" {
 		return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta(mensaje))
 	}
-	return c.JSON(http.StatusOK, map[string]string{"mensaje": mensaje})
+	return c.JSON(http.StatusOK, map[string]string{"Mensaje": mensaje})
 }
 
 func (uc *UsuariosControlador) ReestablecerPassword(c echo.Context) error {
 	type Request struct {
-		IdUsuario int `json:"id_usuario"`
+		IdUsuario int `json:"IdUsuario"`
 	}
 	tokenSesion, _ := c.Get("adminToken").(string)
 	req := &Request{}
@@ -125,7 +127,7 @@ func (uc *UsuariosControlador) ReestablecerPassword(c echo.Context) error {
 	if mensaje != "OK" {
 		return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta(mensaje))
 	}
-	return c.JSON(http.StatusOK, map[string]string{"passwordTemporal": passTemporal})
+	return c.JSON(http.StatusOK, map[string]string{"PasswordTemporal": passTemporal})
 }
 
 func (uc *UsuariosControlador) Dame(c echo.Context) error {
@@ -148,13 +150,13 @@ func (uc *UsuariosControlador) Dame(c echo.Context) error {
 	if mensaje != "OK" {
 		return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta(mensaje))
 	}
-	return c.JSON(http.StatusOK, map[string]interface{}{"mensaje": mensaje, "usuario": usuario})
+	return c.JSON(http.StatusOK, map[string]interface{}{"Mensaje": mensaje, "Usuario": usuario})
 }
 
 func (uc *UsuariosControlador) Login(c echo.Context) error {
 	type Request struct {
-		Usuario  string `json:"usuario"`
-		Password string `json:"password"`
+		Usuario  string `json:"Usuario"`
+		Password string `json:"Password"`
 	}
 	req := &Request{}
 	if err := c.Bind(req); err != nil {
@@ -171,7 +173,7 @@ func (uc *UsuariosControlador) Login(c echo.Context) error {
 	if mensaje != "OK" {
 		return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta(mensaje))
 	}
-	return c.JSON(http.StatusOK, map[string]string{"mensaje": mensaje, "tokenSesion": tokenSesion})
+	return c.JSON(http.StatusOK, map[string]string{"Mensaje": mensaje, "TokenSesion": tokenSesion})
 }
 
 func (uc *UsuariosControlador) Activar(c echo.Context) error {
@@ -194,7 +196,7 @@ func (uc *UsuariosControlador) Activar(c echo.Context) error {
 	if mensaje != "OK" {
 		return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta(mensaje))
 	}
-	return c.JSON(http.StatusOK, map[string]string{"mensaje": mensaje})
+	return c.JSON(http.StatusOK, map[string]string{"Mensaje": mensaje})
 }
 
 func (uc *UsuariosControlador) Desactivar(c echo.Context) error {
@@ -217,14 +219,14 @@ func (uc *UsuariosControlador) Desactivar(c echo.Context) error {
 	if mensaje != "OK" {
 		return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta(mensaje))
 	}
-	return c.JSON(http.StatusOK, map[string]string{"mensaje": mensaje})
+	return c.JSON(http.StatusOK, map[string]string{"Mensaje": mensaje})
 }
 
 func (uc *UsuariosControlador) ConfirmarUsuario(c echo.Context) error {
 	type Request struct {
 		IdUsuario         int    `param:"id_usuario"`
-		Password          string `json:"password"`
-		ConfirmarPassword string `json:"confirmar_password"`
+		Password          string `json:"Password"`
+		ConfirmarPassword string `json:"ConfirmarPassword"`
 	}
 	tokenSesion, _ := c.Get("adminToken").(string)
 	req := &Request{}
@@ -245,5 +247,5 @@ func (uc *UsuariosControlador) ConfirmarUsuario(c echo.Context) error {
 	if mensaje != "OK" {
 		return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta(mensaje))
 	}
-	return c.JSON(http.StatusOK, map[string]string{"mensaje": mensaje})
+	return c.JSON(http.StatusOK, map[string]string{"Mensaje": mensaje})
 }

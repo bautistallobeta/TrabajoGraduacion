@@ -7,12 +7,12 @@ import (
 )
 
 type Usuarios struct {
-	IdUsuario              int    `json:"id_usuario"`
-	Usuario                string `json:"usuario"`
-	TokenSesion            string `json:"token_sesion"`
-	FechaAlta              string `json:"fecha_alta"`
-	Estado                 string `json:"estado"`
-	RequiereCambioPassword string `json:"requiere_cambio_password"`
+	IdUsuario              int    `json:"IdUsuario"`
+	Usuario                string `json:"Usuario"`
+	TokenSesion            string `json:"TokenSesion"`
+	FechaAlta              string `json:"FechaAlta"`
+	Estado                 string `json:"Estado"`
+	RequiereCambioPassword string `json:"RequiereCambioPassword"`
 }
 
 // Instancia un usuario específico por su ID.
@@ -50,10 +50,6 @@ func (u *Usuarios) Dame(tokenSesion string) (string, error) {
 			u.Estado = ""
 		}
 	}
-	if mensaje != "OK" {
-		return mensaje, errors.New(mensaje)
-	}
-
 	return mensaje, nil
 }
 

@@ -19,7 +19,7 @@ func NewCuentasControlador(gc *gestores.GestorCuentas) *CuentasControlador {
 	return &CuentasControlador{Gestor: gc}
 }
 
-func (cc *CuentasControlador) DameCuenta(c echo.Context) error {
+func (cc *CuentasControlador) Dame(c echo.Context) error {
 	type Request struct {
 		IdCuenta string `param:"id_cuenta"`
 	}
@@ -34,33 +34,30 @@ func (cc *CuentasControlador) DameCuenta(c echo.Context) error {
 		return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta("IdCuenta no puede ser vacío"))
 	}
 
-	cuenta := &models.Cuenta{IdCuenta: req.IdCuenta}
-	if err := cuenta.Dame(); err != nil {
-		if err != nil {
-			return c.JSON(http.StatusNotFound, models.NewErrorRespuesta(err.Error()))
-		}
-
+	cuenta := &models.Cuentas{IdCuenta: req.IdCuenta}
+	err := cuenta.Dame()
+	if err != nil {
 		return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta("Error al obtener cuenta: "+err.Error()))
 	}
 	return c.JSON(http.StatusOK, cuenta)
 }
 
-func (cc *CuentasControlador) DameHistorialCuenta(c echo.Context) error {
+func (cc *CuentasControlador) DameHistorial(c echo.Context) error {
 	type Request struct {
 		IdCuenta string `param:"id_cuenta"`
 	}
 
 	type BalanceHistorial struct {
-		Debitos   string `json:"debitos"`
-		Creditos  string `json:"creditos"`
-		Balance   string `json:"balance"`
-		Timestamp uint64 `json:"timestamp"`
+		Debitos   string `json:"Debitos"`
+		Creditos  string `json:"Creditos"`
+		Balance   string `json:"Balance"`
+		Timestamp uint64 `json:"Timestamp"`
 	}
 
 	type Response struct {
-		IdCuenta  string             `json:"id_cuenta"`
-		Total     int                `json:"total"`
-		Historial []BalanceHistorial `json:"historial"`
+		IdCuenta  string             `json:"IdCuenta"`
+		Total     int                `json:"Total"`
+		Historial []BalanceHistorial `json:"Historial"`
 	}
 
 	req := &Request{}
@@ -106,7 +103,7 @@ func (cc *CuentasControlador) DameHistorialCuenta(c echo.Context) error {
 	}
 
 	//obtener historial
-	cuenta := &models.Cuenta{IdCuenta: req.IdCuenta}
+	cuenta := &models.Cuentas{IdCuenta: req.IdCuenta}
 	balances, err := cuenta.DameHistorialBalances(timestampMin, timestampMax, limite)
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, models.NewErrorRespuesta("Error al obtener historial: "+err.Error()))
@@ -136,11 +133,11 @@ func (cc *CuentasControlador) DameHistorialCuenta(c echo.Context) error {
 	return c.JSON(http.StatusOK, respuesta)
 }
 
-func (cc *CuentasControlador) CrearCuenta(c echo.Context) error {
+func (cc *CuentasControlador) Crear(c echo.Context) error {
 	type crearCuentaRequest struct {
-		IdUsuarioFinal uint64 `json:"id_usuario_final"`
-		IdLedger       uint32 `json:"id_ledger"`
-		FechaAlta      string `json:"fecha_alta"`
+		IdUsuarioFinal uint64 `json:"IdUsuarioFinal"`
+		IdLedger       uint32 `json:"IdLedger"`
+		FechaAlta      string `json:"FechaAlta"`
 	}
 
 	req := &crearCuentaRequest{}
@@ -164,17 +161,17 @@ func (cc *CuentasControlador) CrearCuenta(c echo.Context) error {
 	}
 
 	return c.JSON(http.StatusCreated, map[string]interface{}{
-		"status": "OK: Cuenta creada exitosamente",
-		"id":     idCuentaTBString,
+		"Mensaje": "Cuenta creada exitosamente",
+		"Id":      idCuentaTBString,
 	})
 }
 
-func (cc *CuentasControlador) BuscarCuentas(c echo.Context) error {
+func (cc *CuentasControlador) Buscar(c echo.Context) error {
 	idUsuarioFinalStr := c.QueryParam("id_usuario_final")
 	idLedgerStr := c.QueryParam("id_ledger")
 	tipoStr := c.QueryParam("tipo")
 	estado := c.QueryParam("estado")
-	limitStr := c.QueryParam("limit")
+	limitStr := c.QueryParam("limite")
 
 	var idUsuarioFinal uint64 = 0
 	if idUsuarioFinalStr != "" {
@@ -230,9 +227,9 @@ func (cc *CuentasControlador) BuscarCuentas(c echo.Context) error {
 	}
 
 	// armar respuesta formateada
-	respuesta := make([]models.Cuenta, 0, len(cuentas))
+	respuesta := make([]models.Cuentas, 0, len(cuentas))
 	for _, cuentaTB := range cuentas {
-		cuenta := models.Cuenta{
+		cuenta := models.Cuentas{
 			IdCuenta:       utils.Uint128AStringDecimal(cuentaTB.ID),
 			IdUsuarioFinal: cuentaTB.UserData64,
 			IdLedger:       cuentaTB.Ledger,
@@ -263,7 +260,7 @@ func (cc *CuentasControlador) BuscarCuentas(c echo.Context) error {
 	}
 
 	return c.JSON(http.StatusOK, map[string]interface{}{
-		"total":   len(respuesta),
-		"cuentas": respuesta,
+		"Total":   len(respuesta),
+		"Cuentas": respuesta,
 	})
 }

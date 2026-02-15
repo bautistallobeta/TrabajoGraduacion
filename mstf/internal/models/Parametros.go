@@ -7,10 +7,10 @@ import (
 )
 
 type Parametros struct {
-	Parametro     string `json:"parametro"`
-	Valor         string `json:"valor"`
-	Descripcion   string `json:"descripcion"`
-	EsModificable string `json:"es_modificable"`
+	Parametro     string `json:"Parametro"`
+	Valor         string `json:"Valor"`
+	Descripcion   string `json:"Descripcion"`
+	EsModificable string `json:"EsModificable"`
 }
 
 // Devuelve los datos de un parámetro específico por su clave.
@@ -49,10 +49,7 @@ func (p *Parametros) Dame(tokenSesion string) (string, error) {
 		}
 		return mensaje, nil
 	}
-	if mensaje != "OK" {
-		return mensaje, errors.New(mensaje)
-	}
-	return mensaje, nil
+	return mensaje, errors.New("Error al obtener el parámetro")
 }
 
 //	Permite buscar los parámetros del sistema según su nombre. Si pSoloModificables es 'S', muestra solo los

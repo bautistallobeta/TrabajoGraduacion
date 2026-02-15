@@ -1,7 +1,7 @@
 package models
 
 type ErrorRespuesta struct {
-	Error string `json:"error"`
+	Error string `json:"Error"`
 }
 
 func NewErrorRespuesta(errMsg string) ErrorRespuesta {

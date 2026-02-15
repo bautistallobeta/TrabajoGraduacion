@@ -10,7 +10,7 @@ import (
 )
 
 // "wrapper" de Account de TB
-type Cuenta struct {
+type Cuentas struct {
 	IdCuenta       string
 	IdUsuarioFinal uint64
 	IdLedger       uint32
@@ -25,10 +25,10 @@ type Cuenta struct {
 // TODO: limite se tiene que obtener de db relacional
 const LimiteHistorialBalances uint32 = 100
 
-func (c *Cuenta) Dame() error {
+func (c *Cuentas) Dame() error {
 	idCuentaCast, err := utils.ParsearUint128(c.IdCuenta)
 	if err != nil {
-		return errors.New("IdCuenta formato incorrecto")
+		return errors.New("IdCuenta formato incorrecto: " + err.Error())
 	}
 	if idCuentaCast == (types.Uint128{}) || idCuentaCast == types.ToUint128(0) {
 		return errors.New("IdCuenta no puede ser nulo ni cero")
@@ -80,19 +80,19 @@ func (c *Cuenta) Dame() error {
 }
 
 // TODO
-func (c *Cuenta) Activar() (string, error) {
+func (c *Cuentas) Activar() (string, error) {
 	c.Estado = "A"
 	return "Activada", nil
 }
 
 // TODO
-func (c *Cuenta) Desactivar() (string, error) {
+func (c *Cuentas) Desactivar() (string, error) {
 	c.Estado = "I"
 	return "Desactivada", nil
 }
 
 // TODO: comentario de método de clase
-func (c *Cuenta) DameHistorialBalances(timestampMin uint64, timestampMax uint64, limite uint32) ([]types.AccountBalance, error) {
+func (c *Cuentas) DameHistorialBalances(timestampMin uint64, timestampMax uint64, limite uint32) ([]types.AccountBalance, error) {
 	if c.IdCuenta == "" {
 		return nil, errors.New("IdCuenta no puede estar vacío")
 	}

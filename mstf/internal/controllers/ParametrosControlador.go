@@ -40,7 +40,7 @@ func (pc *ParametrosControlador) Dame(c echo.Context) error {
 func (pc *ParametrosControlador) Modificar(c echo.Context) error {
 	type Request struct {
 		Parametro string `param:"parametro"`
-		Valor     string `json:"valor"`
+		Valor     string `json:"Valor"`
 	}
 	tokenSesion, _ := c.Get("adminToken").(string)
 	req := &Request{}
@@ -61,7 +61,7 @@ func (pc *ParametrosControlador) Modificar(c echo.Context) error {
 	if mensaje != "OK" {
 		return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta(mensaje))
 	}
-	return c.JSON(http.StatusOK, map[string]string{"mensaje": mensaje})
+	return c.JSON(http.StatusOK, map[string]string{"Mensaje": mensaje})
 }
 
 func (pc *ParametrosControlador) Buscar(c echo.Context) error {

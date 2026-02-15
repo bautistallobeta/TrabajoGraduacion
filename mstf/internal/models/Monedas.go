@@ -10,7 +10,7 @@ import (
 type Monedas struct {
 	IdMoneda        int            `json:"IdMoneda"`
 	Ledger          int            `json:"Ledger"`
-	IdCuentaEmpresa sql.NullString `json:"IdCuentaEmpresa"`
+	IdCuentaEmpresa string         `json:"IdCuentaEmpresa"`
 	Estado          string         `json:"Estado"`
 	FechaAlta       time.Time      `json:"FechaAlta"`
 }
@@ -27,15 +27,21 @@ func (m *Monedas) Dame(db *sql.DB, tokenSesion string) (string, error) {
 	var mensaje string
 	var idMoneda sql.NullInt32
 	var ledger sql.NullInt32
+	var idCuentaEmpresa sql.NullString
 	var estado sql.NullString
 	var fechaAlta sql.NullTime
 	if rows.Next() {
-		err = rows.Scan(&mensaje, &idMoneda, &ledger, &m.IdCuentaEmpresa, &estado, &fechaAlta)
+		err = rows.Scan(&mensaje, &idMoneda, &ledger, &idCuentaEmpresa, &estado, &fechaAlta)
 
 		if idMoneda.Valid {
 			m.IdMoneda = int(idMoneda.Int32)
 		} else {
 			m.IdMoneda = 0
+		}
+		if idCuentaEmpresa.Valid {
+			m.IdCuentaEmpresa = idCuentaEmpresa.String
+		} else {
+			m.IdCuentaEmpresa = ""
 		}
 		if fechaAlta.Valid {
 			m.FechaAlta = fechaAlta.Time
@@ -64,9 +70,10 @@ func (m *Monedas) Dame(db *sql.DB, tokenSesion string) (string, error) {
 func (m *Monedas) DamePorLedger(db *sql.DB, tokenSesion string, ledger int) (string, error) {
 	var idMoneda sql.NullInt32
 	var mensaje string
+	var idCuentaEmpresa sql.NullString
 	var estado sql.NullString
 	var fechaAlta sql.NullTime
-	err := db.QueryRow("CALL tsp_dame_moneda_por_ledger(?, ?)", tokenSesion, ledger).Scan(&mensaje, &idMoneda, &m.Ledger, &m.IdCuentaEmpresa, &estado, &fechaAlta)
+	err := db.QueryRow("CALL tsp_dame_moneda_por_ledger(?, ?)", tokenSesion, ledger).Scan(&mensaje, &idMoneda, &m.Ledger, &idCuentaEmpresa, &estado, &fechaAlta)
 	if err != nil {
 		return "", err
 	}
@@ -77,6 +84,11 @@ func (m *Monedas) DamePorLedger(db *sql.DB, tokenSesion string, ledger int) (str
 		m.IdMoneda = int(idMoneda.Int32)
 	} else {
 		m.IdMoneda = 0
+	}
+	if idCuentaEmpresa.Valid {
+		m.IdCuentaEmpresa = idCuentaEmpresa.String
+	} else {
+		m.IdCuentaEmpresa = ""
 	}
 	if estado.Valid {
 		m.Estado = estado.String

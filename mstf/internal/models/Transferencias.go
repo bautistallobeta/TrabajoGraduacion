@@ -10,7 +10,7 @@ import (
 )
 
 // "wrapper" de Transfer de TB
-type Transferencia struct {
+type Transferencias struct {
 	IdTransferencia string
 	IdCuentaDebito  string
 	IdCuentaCredito string
@@ -23,8 +23,11 @@ type Transferencia struct {
 }
 
 // TODO: agregar comentario de método de clase
-func (t *Transferencia) Dame() error {
+func (t *Transferencias) Dame() error {
 	idTransferenciaCast, err := utils.ParsearUint128(t.IdTransferencia)
+	if err != nil {
+		return errors.New("IdTransferencia inválido: " + err.Error())
+	}
 
 	if idTransferenciaCast == (types.Uint128{}) || idTransferenciaCast == types.ToUint128(0) {
 		return errors.New("IdTransferencia no puede ser nulo ni cero")
@@ -61,6 +64,6 @@ func (t *Transferencia) Dame() error {
 }
 
 // TODO
-func (t *Transferencia) Revertir() (string, error) {
-	return "Reversión no implementada", errors.New("NO Implementado")
+func (t *Transferencias) Revertir() (string, error) {
+	return "Reversión no implementada", errors.New("No implementado")
 }

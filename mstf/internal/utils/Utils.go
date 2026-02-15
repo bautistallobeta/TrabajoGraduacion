@@ -67,7 +67,7 @@ func FechaAUserData128(s string) (types.Uint128, error) {
 		}
 	}
 	if err != nil {
-		return types.Uint128{}, errors.New("invalid datetime format; expected 'YYYY-MM-DD HH:MM:SS[.fraction]' or RFC3339")
+		return types.Uint128{}, errors.New("Formato de fecha inválido; esperado 'YYYY-MM-DD HH:MM:SS[.fracción]' o RFC3339")
 	}
 	// nanosegundos a uint64
 	ns := uint64(t.UnixNano())

@@ -31,7 +31,7 @@ func (gc *GestorCuentas) Buscar(
 ) ([]types.Account, error) {
 
 	if persistence.ClienteTB == nil {
-		return nil, errors.New("conexión a TigerBeetle no inicializada")
+		return nil, errors.New("Conexión a TigerBeetle no inicializada")
 	}
 
 	resultados := make([]types.Account, 0)
@@ -114,7 +114,7 @@ func (gc *GestorCuentas) Buscar(
 // TODO: agregar comentario de método de clase
 func (gc *GestorCuentas) Crear(idLedger uint32, idUsuarioFinal uint64, fechaAlta string, debitosNoDebenExcederCreditos bool) (string, error) {
 	if persistence.ClienteTB == nil {
-		return "", errors.New("TBClient no inicializado")
+		return "", errors.New("Conexión a TigerBeetle no inicializada")
 	}
 
 	// idLedger son los 64 bits mas significativa y idUsuarioFinal los menos significativa
@@ -130,7 +130,7 @@ func (gc *GestorCuentas) Crear(idLedger uint32, idUsuarioFinal uint64, fechaAlta
 
 	fechaAltaUint32, err := utils.FechaAUserData32(fechaAlta)
 	if err != nil {
-		return "", errors.New("formato de fecha_alta inválido: " + err.Error())
+		return "", errors.New("Formato de FechaAlta inválido: " + err.Error())
 	}
 
 	cuentaTB := types.Account{
@@ -157,12 +157,12 @@ func (gc *GestorCuentas) Crear(idLedger uint32, idUsuarioFinal uint64, fechaAlta
 
 // TODO
 func (gc *GestorCuentas) Borrar(id types.Uint128) (string, error) {
-	return "Borrado lógico no implementado", errors.New("not implemented")
+	return "Borrado lógico no implementado", errors.New("No implementado")
 }
 
 // TODO
-func (gc *GestorCuentas) Modificar(cuenta models.Cuenta) (string, error) {
-	return "Modificación no implementada", errors.New("not implemented")
+func (gc *GestorCuentas) Modificar(cuenta models.Cuentas) (string, error) {
+	return "Modificación no implementada", errors.New("No implementado")
 }
 
 // --------------------------------------------------------------------------------

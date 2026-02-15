@@ -83,14 +83,13 @@ func main() {
 
 	// Productor Kafka (unicamente para probar inserción de mensajes en la cola)
 	// TODO: aclarar en docmentación que esto es solo para pruebas y para la demostración de la creación de transferancias
-	// CORREGIR: HAY DOS INICIALIZAC DE PRODUCTOR, ESTA DE ACA Y OTRA EN EL ROUTER
 	productor, err := kafkamstf.InitProductor(cfg)
 	if err != nil {
 		log.Fatalf("FATAL: No se pudo conectar a Kafka (Productor): %v", err)
 	}
 
 	// Inicializar router HTTP
-	e := httpRouter.InitRouter(cfg, notificador)
+	e := httpRouter.InitRouter(notificador, productor)
 
 	// Arranque del server
 	go func() {

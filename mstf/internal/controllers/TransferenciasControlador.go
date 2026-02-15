@@ -17,7 +17,7 @@ type TransferenciasControlador struct {
 func NewTransferenciasControlador(gt *gestores.GestorTransferencias, pr *kafka.ProductorKafka) *TransferenciasControlador {
 	return &TransferenciasControlador{Gestor: gt, Productor: pr}
 }
-func (tc *TransferenciasControlador) DameTransferencia(c echo.Context) error {
+func (tc *TransferenciasControlador) Dame(c echo.Context) error {
 	type Request struct {
 		IdTransferencia string `param:"id_transferencia"`
 	}
@@ -31,7 +31,7 @@ func (tc *TransferenciasControlador) DameTransferencia(c echo.Context) error {
 		return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta("IdTransferencia no puede ser vacío"))
 	}
 
-	transferencia := &models.Transferencia{IdTransferencia: req.IdTransferencia}
+	transferencia := &models.Transferencias{IdTransferencia: req.IdTransferencia}
 	if err := transferencia.Dame(); err != nil {
 		return c.JSON(http.StatusNotFound, models.NewErrorRespuesta("Transferencia no encontrada"))
 	}
@@ -39,7 +39,7 @@ func (tc *TransferenciasControlador) DameTransferencia(c echo.Context) error {
 }
 
 // Este método responde al POST /transferencias que se creó UNICAMENTE para probar el ms
-func (tc *TransferenciasControlador) CrearTransferencia(c echo.Context) error {
+func (tc *TransferenciasControlador) Crear(c echo.Context) error {
 	req := new(models.KafkaTransferencias)
 
 	if err := c.Bind(req); err != nil {
@@ -64,7 +64,7 @@ func (tc *TransferenciasControlador) CrearTransferencia(c echo.Context) error {
 
 	// 202 Accepted (está encolada en kafka pendiente de ser procesada)
 	return c.JSON(http.StatusAccepted, map[string]interface{}{
-		"mensaje": "Transferencia aceptada y encolada en Kafka.",
-		"id":      req.IdTransferencia,
+		"Mensaje": "Transferencia aceptada y encolada en Kafka.",
+		"Id":      req.IdTransferencia,
 	})
 }
