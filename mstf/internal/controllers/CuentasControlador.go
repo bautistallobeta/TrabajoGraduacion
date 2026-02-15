@@ -136,7 +136,7 @@ func (cc *CuentasControlador) DameHistorial(c echo.Context) error {
 func (cc *CuentasControlador) Crear(c echo.Context) error {
 	type crearCuentaRequest struct {
 		IdUsuarioFinal uint64 `json:"IdUsuarioFinal"`
-		IdLedger       uint32 `json:"IdLedger"`
+		IdMoneda       uint32 `json:"IdMoneda"`
 		FechaAlta      string `json:"FechaAlta"`
 	}
 
@@ -146,15 +146,15 @@ func (cc *CuentasControlador) Crear(c echo.Context) error {
 		return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta("JSON inválido o tipo de datos incorrecto: "+err.Error()))
 	}
 
-	if req.IdUsuarioFinal == 0 || req.IdLedger == 0 {
-		return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta("Faltan campos requeridos: id_usuario_final, id_ledger"))
+	if req.IdUsuarioFinal == 0 || req.IdMoneda == 0 {
+		return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta("Faltan campos requeridos: IdUsuarioFinal, IdMoneda"))
 	}
 	if req.FechaAlta == "" {
 		return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta("Falta campo requerido: fecha_alta"))
 	}
 
 	// cuentas creadas vía API siempre tienen DebitsMustNotExceedCredits = true
-	idCuentaTBString, err := cc.Gestor.Crear(req.IdLedger, req.IdUsuarioFinal, req.FechaAlta, true)
+	idCuentaTBString, err := cc.Gestor.Crear(req.IdMoneda, req.IdUsuarioFinal, req.FechaAlta, true)
 
 	if err != nil {
 		return c.JSON(http.StatusConflict, models.NewErrorRespuesta("Error al crear cuenta: "+err.Error()))
@@ -169,7 +169,6 @@ func (cc *CuentasControlador) Crear(c echo.Context) error {
 func (cc *CuentasControlador) Buscar(c echo.Context) error {
 	idUsuarioFinalStr := c.QueryParam("id_usuario_final")
 	idLedgerStr := c.QueryParam("id_ledger")
-	tipoStr := c.QueryParam("tipo")
 	estado := c.QueryParam("estado")
 	limitStr := c.QueryParam("limite")
 
@@ -189,15 +188,6 @@ func (cc *CuentasControlador) Buscar(c echo.Context) error {
 			return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta("id_ledger debe ser un número válido"))
 		}
 		idLedger = uint32(parsed)
-	}
-
-	var tipo uint16 = 0
-	if tipoStr != "" {
-		parsed, err := strconv.ParseUint(tipoStr, 10, 16)
-		if err != nil {
-			return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta("tipo debe ser un número válido"))
-		}
-		tipo = uint16(parsed)
 	}
 
 	// solo  se acepta estado "A", "I", o vacío
@@ -221,7 +211,7 @@ func (cc *CuentasControlador) Buscar(c echo.Context) error {
 		limit = uint32(parsed)
 	}
 
-	cuentas, err := cc.Gestor.Buscar(idUsuarioFinal, idLedger, tipo, estado, limit)
+	cuentas, err := cc.Gestor.Buscar(idUsuarioFinal, idLedger, estado, limit)
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, models.NewErrorRespuesta("Error al buscar cuentas: "+err.Error()))
 	}
@@ -232,10 +222,9 @@ func (cc *CuentasControlador) Buscar(c echo.Context) error {
 		cuenta := models.Cuentas{
 			IdCuenta:       utils.Uint128AStringDecimal(cuentaTB.ID),
 			IdUsuarioFinal: cuentaTB.UserData64,
-			IdLedger:       cuentaTB.Ledger,
+			IdMoneda:       cuentaTB.Ledger,
 			Creditos:       utils.Uint128AStringDecimal(cuentaTB.CreditsPosted),
 			Debitos:        utils.Uint128AStringDecimal(cuentaTB.DebitsPosted),
-			Tipo:           uint64(cuentaTB.Code),
 		}
 		//Leer el estado
 		closedFlags := types.AccountFlags{Closed: true}.ToUint16()

@@ -25,7 +25,6 @@ func NewGestorCuentas(tbClient tigerbeetle.Client) *GestorCuentas {
 func (gc *GestorCuentas) Buscar(
 	idUsuarioFinal uint64,
 	idLedger uint32,
-	tipo uint16,
 	estado string,
 	limit uint32,
 ) ([]types.Account, error) {
@@ -60,7 +59,7 @@ func (gc *GestorCuentas) Buscar(
 			UserData128:  types.ToUint128(0),
 			UserData64:   idUsuarioFinal,
 			UserData32:   0,
-			Code:         tipo,
+			Code:         0,
 			Ledger:       idLedger,
 			TimestampMin: timestampMin,
 			TimestampMax: 0,

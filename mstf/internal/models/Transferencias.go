@@ -14,10 +14,9 @@ type Transferencias struct {
 	IdTransferencia string
 	IdCuentaDebito  string
 	IdCuentaCredito string
-	IdLedger        uint32
+	IdMoneda        uint32
 	Monto           string
 	Categoria       uint64
-	Tipo            uint16
 	Fecha           string
 	Estado          string
 }
@@ -53,10 +52,9 @@ func (t *Transferencias) Dame() error {
 	// Asignacipon de campos tb a modelo
 	t.IdCuentaDebito = utils.Uint128AStringDecimal(transferenciaTB.DebitAccountID)
 	t.IdCuentaCredito = utils.Uint128AStringDecimal(transferenciaTB.CreditAccountID)
-	t.IdLedger = transferenciaTB.Ledger
+	t.IdMoneda = transferenciaTB.Ledger
 	t.Monto = utils.Uint128AStringDecimal(transferenciaTB.Amount)
 	t.Categoria = transferenciaTB.UserData64
-	t.Tipo = uint16(transferenciaTB.Flags)
 	t.Fecha = fecha
 	t.Estado = "F"
 

@@ -13,10 +13,9 @@ import (
 type Cuentas struct {
 	IdCuenta       string
 	IdUsuarioFinal uint64
-	IdLedger       uint32
+	IdMoneda       uint32
 	Creditos       string
 	Debitos        string
-	Tipo           uint64
 	Estado         string
 	FechaAlta      string
 	FechaRegistro  string
@@ -50,8 +49,7 @@ func (c *Cuentas) Dame() error {
 	cuentaTB := accounts[0]
 
 	c.IdUsuarioFinal = cuentaTB.UserData64
-	c.IdLedger = cuentaTB.Ledger
-	c.Tipo = uint64(cuentaTB.Code)
+	c.IdMoneda = cuentaTB.Ledger
 	c.Creditos = utils.Uint128AStringDecimal(cuentaTB.CreditsPosted)
 	c.Debitos = utils.Uint128AStringDecimal(cuentaTB.DebitsPosted)
 
