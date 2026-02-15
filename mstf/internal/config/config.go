@@ -46,22 +46,22 @@ func Load() Config {
 	cfg.DireccionesTigerBeetle = []string{tbAddr}
 
 	// Webhook
-	cfg.URLWebhook = mustGetEnv("WEBHOOK_URL", "https://1bc01e79058ef53d7f2egth9quayyyyyb.oast.pro")
+	cfg.URLWebhook = mustGetEnv("WEBHOOK_URL", "")
 
 	//  Kafka
-	kafkaBrokerStr := mustGetEnv("KAFKA_BROKERS", "localhost:9092")
+	kafkaBrokerStr := mustGetEnv("KAFKA_BROKERS", "")
 	cfg.BrokersKafka = strings.Split(kafkaBrokerStr, ",")
-	cfg.TopicKafka = mustGetEnv("KAFKA_TOPIC", "transfers_pendientes")
-	cfg.GroupIDKafka = mustGetEnv("KAFKA_GROUP_ID", "mstf_consumers_v1")
-	cfg.TamanoLoteKafka = mustGetEnvInt("KAFKA_BATCH_SIZE", 3)
+	cfg.TopicKafka = mustGetEnv("KAFKA_TOPIC", "")
+	cfg.GroupIDKafka = mustGetEnv("KAFKA_GROUP_ID", "")
+	cfg.TamanoLoteKafka = mustGetEnvInt("KAFKA_BATCH_SIZE", 1000)
 	cfg.TimeoutLoteKafka = time.Duration(mustGetEnvInt("KAFKA_BATCH_TIMEOUT_MS", 20000)) * time.Millisecond
 
 	// MySQL
-	cfg.MySQLHost = mustGetEnv("MYSQL_HOST", "localhost")
+	cfg.MySQLHost = mustGetEnv("MYSQL_HOST", "")
 	cfg.MySQLPort = mustGetEnvInt("MYSQL_PORT", 3306)
-	cfg.MySQLUser = mustGetEnv("MYSQL_USER", "root")
+	cfg.MySQLUser = mustGetEnv("MYSQL_USER", "")
 	cfg.MySQLPassword = mustGetEnv("MYSQL_PASSWORD", "")
-	cfg.MySQLDatabase = mustGetEnv("MYSQL_DATABASE", "mstf")
+	cfg.MySQLDatabase = mustGetEnv("MYSQL_DATABASE", "")
 
 	return cfg
 }
