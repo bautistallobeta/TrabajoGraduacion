@@ -64,7 +64,7 @@ func (uc *UsuariosControlador) Buscar(c echo.Context) error {
 
 func (uc *UsuariosControlador) Borrar(c echo.Context) error {
 	type Request struct {
-		IdUsuario int `param:"id_usuario"`
+		IdUsuario int `param:"IdUsuario"`
 	}
 	tokenSesion, _ := c.Get("adminToken").(string)
 	req := &Request{}
@@ -132,7 +132,7 @@ func (uc *UsuariosControlador) ReestablecerPassword(c echo.Context) error {
 
 func (uc *UsuariosControlador) Dame(c echo.Context) error {
 	type Request struct {
-		IdUsuario int `param:"id_usuario"`
+		IdUsuario int `param:"IdUsuario"`
 	}
 	tokenSesion, _ := c.Get("adminToken").(string)
 	req := &Request{}
@@ -178,7 +178,7 @@ func (uc *UsuariosControlador) Login(c echo.Context) error {
 
 func (uc *UsuariosControlador) Activar(c echo.Context) error {
 	type Request struct {
-		IdUsuario int `param:"id_usuario"`
+		IdUsuario int `param:"IdUsuario"`
 	}
 	tokenSesion, _ := c.Get("adminToken").(string)
 	req := &Request{}
@@ -201,7 +201,7 @@ func (uc *UsuariosControlador) Activar(c echo.Context) error {
 
 func (uc *UsuariosControlador) Desactivar(c echo.Context) error {
 	type Request struct {
-		IdUsuario int `param:"id_usuario"`
+		IdUsuario int `param:"IdUsuario"`
 	}
 	tokenSesion, _ := c.Get("adminToken").(string)
 	req := &Request{}
@@ -224,7 +224,7 @@ func (uc *UsuariosControlador) Desactivar(c echo.Context) error {
 
 func (uc *UsuariosControlador) ConfirmarUsuario(c echo.Context) error {
 	type Request struct {
-		IdUsuario         int    `param:"id_usuario"`
+		IdUsuario         int    `param:"IdUsuario"`
 		Password          string `json:"Password"`
 		ConfirmarPassword string `json:"ConfirmarPassword"`
 	}

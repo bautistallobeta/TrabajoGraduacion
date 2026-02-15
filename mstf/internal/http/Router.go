@@ -39,6 +39,8 @@ func initRoutes(router *echo.Echo, notificador *webhook.Notificador, productor *
 	gestorUsuarios := gestores.NewGestorUsuarios(persistence.ClienteMySQL)
 	usuariosControlador := controllers.NewUsuariosControlador(gestorUsuarios)
 	paramControlador := controllers.NewParametrosControlador()
+	gestorMonedas := gestores.NewGestorMonedas(persistence.ClienteMySQL)
+	monedasControlador := controllers.NewMonedasControlador(gestorMonedas)
 
 	// Endpoint de prueba
 	router.GET("/ping", mainControlador.Ping)
@@ -69,5 +71,12 @@ func initRoutes(router *echo.Echo, notificador *webhook.Notificador, productor *
 	router.GET("/parametros/:parametro", paramControlador.Dame)
 	router.GET("/parametros", paramControlador.Buscar)
 	router.PUT("/parametros/:parametro", paramControlador.Modificar)
+
+	// Monedas
+	router.GET("/monedas/:id_moneda", monedasControlador.Dame)
+	router.POST("/monedas", monedasControlador.Crear)
+	router.DELETE("/monedas/:id_moneda", monedasControlador.Borrar)
+	router.GET("/monedas", monedasControlador.Listar)
+	router.PUT("/monedas/:id_moneda/desactivar", monedasControlador.Desctivar)
 
 }

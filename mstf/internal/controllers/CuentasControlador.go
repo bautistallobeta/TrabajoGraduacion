@@ -21,13 +21,13 @@ func NewCuentasControlador(gc *gestores.GestorCuentas) *CuentasControlador {
 
 func (cc *CuentasControlador) Dame(c echo.Context) error {
 	type Request struct {
-		IdCuenta string `param:"id_cuenta"`
+		IdCuenta string `param:"IdCuenta"`
 	}
 
 	req := &Request{}
 
 	if err := c.Bind(req); err != nil {
-		return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta("Parámetro 'id_cuenta' inválido: "+err.Error()))
+		return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta("Parámetro 'IdCuenta' inválido: "+err.Error()))
 	}
 
 	if req.IdCuenta == "" {
@@ -44,7 +44,7 @@ func (cc *CuentasControlador) Dame(c echo.Context) error {
 
 func (cc *CuentasControlador) DameHistorial(c echo.Context) error {
 	type Request struct {
-		IdCuenta string `param:"id_cuenta"`
+		IdCuenta string `param:"IdCuenta"`
 	}
 
 	type BalanceHistorial struct {
@@ -63,7 +63,7 @@ func (cc *CuentasControlador) DameHistorial(c echo.Context) error {
 	req := &Request{}
 
 	if err := c.Bind(req); err != nil {
-		return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta("Parámetro 'id_cuenta' inválido: "+err.Error()))
+		return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta("Parámetro 'IdCuenta' inválido: "+err.Error()))
 	}
 
 	if req.IdCuenta == "" {
@@ -71,9 +71,9 @@ func (cc *CuentasControlador) DameHistorial(c echo.Context) error {
 	}
 
 	// Parsear query params opcionales (0 = sin filrto)
-	timestampMinStr := c.QueryParam("timestamp_min")
-	timestampMaxStr := c.QueryParam("timestamp_max")
-	limiteStr := c.QueryParam("limite")
+	timestampMinStr := c.QueryParam("TimeStampMin")
+	timestampMaxStr := c.QueryParam("TimeStampMax")
+	limiteStr := c.QueryParam("Limite")
 	var timestampMin uint64 = 0
 	var timestampMax uint64 = 0
 	var limite uint32 = 0
@@ -81,7 +81,7 @@ func (cc *CuentasControlador) DameHistorial(c echo.Context) error {
 	if timestampMinStr != "" {
 		parsed, err := strconv.ParseUint(timestampMinStr, 10, 64)
 		if err != nil {
-			return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta("Parámetro 'timestamp_min' inválido"))
+			return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta("Parámetro 'TimeStampMin' inválido"))
 		}
 		timestampMin = parsed
 	}
@@ -89,7 +89,7 @@ func (cc *CuentasControlador) DameHistorial(c echo.Context) error {
 	if timestampMaxStr != "" {
 		parsed, err := strconv.ParseUint(timestampMaxStr, 10, 64)
 		if err != nil {
-			return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta("Parámetro 'timestamp_max' inválido"))
+			return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta("Parámetro 'TimeStampMax' inválido"))
 		}
 		timestampMax = parsed
 	}
@@ -97,7 +97,7 @@ func (cc *CuentasControlador) DameHistorial(c echo.Context) error {
 	if limiteStr != "" {
 		parsed, err := strconv.ParseUint(limiteStr, 10, 32)
 		if err != nil {
-			return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta("Parámetro 'limite' inválido"))
+			return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta("Parámetro 'Limite' inválido"))
 		}
 		limite = uint32(parsed)
 	}
@@ -150,7 +150,7 @@ func (cc *CuentasControlador) Crear(c echo.Context) error {
 		return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta("Faltan campos requeridos: IdUsuarioFinal, IdMoneda"))
 	}
 	if req.FechaAlta == "" {
-		return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta("Falta campo requerido: fecha_alta"))
+		return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta("Falta campo requerido: FechaAlta"))
 	}
 
 	// cuentas creadas vía API siempre tienen DebitsMustNotExceedCredits = true
@@ -167,16 +167,16 @@ func (cc *CuentasControlador) Crear(c echo.Context) error {
 }
 
 func (cc *CuentasControlador) Buscar(c echo.Context) error {
-	idUsuarioFinalStr := c.QueryParam("id_usuario_final")
-	idLedgerStr := c.QueryParam("id_ledger")
-	estado := c.QueryParam("estado")
-	limitStr := c.QueryParam("limite")
+	idUsuarioFinalStr := c.QueryParam("IdUsuarioFinal")
+	idLedgerStr := c.QueryParam("IdLedger")
+	estado := c.QueryParam("Estado")
+	limitStr := c.QueryParam("Limite")
 
 	var idUsuarioFinal uint64 = 0
 	if idUsuarioFinalStr != "" {
 		parsed, err := strconv.ParseUint(idUsuarioFinalStr, 10, 64)
 		if err != nil {
-			return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta("id_usuario_final debe ser un número válido"))
+			return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta("IdUsuarioFinal debe ser un número válido"))
 		}
 		idUsuarioFinal = parsed
 	}
@@ -185,14 +185,14 @@ func (cc *CuentasControlador) Buscar(c echo.Context) error {
 	if idLedgerStr != "" {
 		parsed, err := strconv.ParseUint(idLedgerStr, 10, 32)
 		if err != nil {
-			return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta("id_ledger debe ser un número válido"))
+			return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta("IdLedger debe ser un número válido"))
 		}
 		idLedger = uint32(parsed)
 	}
 
 	// solo  se acepta estado "A", "I", o vacío
 	if estado != "" && estado != "A" && estado != "I" {
-		return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta("estado debe ser 'A' (activo), 'I' (inactivo), o vacío"))
+		return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta("Estado debe ser 'A' (activo), 'I' (inactivo), o vacío"))
 	}
 
 	// Parsear limit con valor hardcodeado a  100 (TODO: valor que se tiene que obtener de la db relac (?))
@@ -200,13 +200,13 @@ func (cc *CuentasControlador) Buscar(c echo.Context) error {
 	if limitStr != "" {
 		parsed, err := strconv.ParseUint(limitStr, 10, 32)
 		if err != nil {
-			return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta("limit debe ser un número válido"))
+			return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta("Limite debe ser un número válido"))
 		}
 		if parsed > 500 {
-			return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta("limit no puede ser mayor a 500"))
+			return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta("Limite no puede ser mayor a 500"))
 		}
 		if parsed == 0 {
-			return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta("limit debe ser mayor a 0"))
+			return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta("Limite debe ser mayor a 0"))
 		}
 		limit = uint32(parsed)
 	}

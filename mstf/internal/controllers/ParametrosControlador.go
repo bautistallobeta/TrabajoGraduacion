@@ -16,7 +16,7 @@ func NewParametrosControlador() *ParametrosControlador {
 
 func (pc *ParametrosControlador) Dame(c echo.Context) error {
 	type Request struct {
-		Parametro string `param:"parametro"`
+		Parametro string `param:"Parametro"`
 	}
 	tokenSesion, _ := c.Get("adminToken").(string)
 	req := &Request{}
@@ -39,7 +39,7 @@ func (pc *ParametrosControlador) Dame(c echo.Context) error {
 
 func (pc *ParametrosControlador) Modificar(c echo.Context) error {
 	type Request struct {
-		Parametro string `param:"parametro"`
+		Parametro string `param:"Parametro"`
 		Valor     string `json:"Valor"`
 	}
 	tokenSesion, _ := c.Get("adminToken").(string)
@@ -66,7 +66,7 @@ func (pc *ParametrosControlador) Modificar(c echo.Context) error {
 
 func (pc *ParametrosControlador) Buscar(c echo.Context) error {
 	type Request struct {
-		Cadena string `query:"cadena"`
+		Cadena string `query:"Cadena"`
 	}
 	tokenSesion, _ := c.Get("adminToken").(string)
 	req := &Request{}

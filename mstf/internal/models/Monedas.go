@@ -17,7 +17,7 @@ type Monedas struct {
 // Instancia los atributos de la moneda desde la base de datos.
 // tsp_dame_moneda
 // - tokenSesion: token de sesión del usuario
-func (m *Monedas) Dame(db *sql.DB, tokenSesion string) (string, error) {
+func (m *Monedas) Dame(tokenSesion string) (string, error) {
 	rows, err := persistence.ClienteMySQL.Query("CALL tsp_dame_moneda(?)", tokenSesion)
 	if err != nil {
 		return "", err
@@ -64,9 +64,9 @@ func (m *Monedas) Dame(db *sql.DB, tokenSesion string) (string, error) {
 // Activa una moneda pendiente asignando la cuenta empresa.
 // tsp_activar_moneda
 // - idCuentaEmpresa: Id de la cuenta empresa en TigerBeetle
-func (m *Monedas) Activar(db *sql.DB, idCuentaEmpresa string) (string, error) {
+func (m *Monedas) Activar(idCuentaEmpresa string) (string, error) {
 	var mensaje string
-	err := db.QueryRow("CALL tsp_activar_moneda(?, ?)", idCuentaEmpresa, m.IdMoneda).Scan(&mensaje)
+	err := persistence.ClienteMySQL.QueryRow("CALL tsp_activar_moneda(?, ?)", idCuentaEmpresa, m.IdMoneda).Scan(&mensaje)
 	if err != nil {
 		return "", err
 	}
@@ -76,9 +76,9 @@ func (m *Monedas) Activar(db *sql.DB, idCuentaEmpresa string) (string, error) {
 // Desactiva una moneda activa.
 // tsp_desactivar_moneda
 // - tokenSesion: token de sesión del usuario
-func (m *Monedas) Desactivar(db *sql.DB, tokenSesion string) (string, error) {
+func (m *Monedas) Desactivar(tokenSesion string) (string, error) {
 	var mensaje string
-	err := db.QueryRow("CALL tsp_desactivar_moneda(?, ?)", tokenSesion, m.IdMoneda).Scan(&mensaje)
+	err := persistence.ClienteMySQL.QueryRow("CALL tsp_desactivar_moneda(?, ?)", tokenSesion, m.IdMoneda).Scan(&mensaje)
 	if err != nil {
 		return "", err
 	}

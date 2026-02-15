@@ -19,7 +19,7 @@ func NewTransferenciasControlador(gt *gestores.GestorTransferencias, pr *kafka.P
 }
 func (tc *TransferenciasControlador) Dame(c echo.Context) error {
 	type Request struct {
-		IdTransferencia string `param:"id_transferencia"`
+		IdTransferencia string `param:"IdTransferencia"`
 	}
 	req := &Request{}
 
