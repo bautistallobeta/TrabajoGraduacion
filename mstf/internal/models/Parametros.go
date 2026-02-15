@@ -1,9 +1,12 @@
 package models
 
 import (
+	"MSTransaccionesFinancieras/internal/infra/cache"
 	"MSTransaccionesFinancieras/internal/infra/persistence"
 	"database/sql"
 	"errors"
+	"log"
+	"time"
 )
 
 type Parametros struct {
@@ -13,24 +16,38 @@ type Parametros struct {
 	EsModificable string `json:"EsModificable"`
 }
 
+var CacheParametros = cache.NewCache[Parametros](15 * time.Second)
+
 // Devuelve los datos de un parámetro específico por su clave.
 // tsp_dame_parametro
 // - tokenSesion: token de sesión del usuario
 // - parametro: clave del parámetro a instanciar
 func (p *Parametros) Dame(tokenSesion string) (string, error) {
+	if cached, ok := CacheParametros.Dame(p.Parametro); ok {
+		*p = cached
+		log.Printf("[CACHE HIT] Parametro '%s' obtenido del caché", p.Parametro)
+		return "OK", nil
+	}
+
 	rows, err := persistence.ClienteMySQL.Query("CALL tsp_dame_parametro(?, ?)", tokenSesion, p.Parametro)
 	if err != nil {
 		return "", err
 	}
 	defer rows.Close()
 	var mensaje string
+	var param sql.NullString
 	var valor sql.NullString
 	var descripcion sql.NullString
 	var esModificable sql.NullString
 	if rows.Next() {
-		err = rows.Scan(&mensaje, &p.Parametro, &valor, &descripcion, &esModificable)
+		err = rows.Scan(&mensaje, &param, &valor, &descripcion, &esModificable)
 		if err != nil {
 			return mensaje, err
+		}
+		if param.Valid {
+			p.Parametro = param.String
+		} else {
+			p.Parametro = ""
 		}
 		if valor.Valid {
 			p.Valor = valor.String
@@ -47,6 +64,8 @@ func (p *Parametros) Dame(tokenSesion string) (string, error) {
 		} else {
 			p.EsModificable = ""
 		}
+		CacheParametros.Guardar(p.Parametro, *p)
+		log.Printf("[CACHE MISS] Parametro '%s' obtenido de MySQL y guardado en caché", p.Parametro)
 		return mensaje, nil
 	}
 	return mensaje, errors.New("Error al obtener el parámetro")
@@ -87,5 +106,7 @@ func (p *Parametros) ModificarParametro(tokenSesion string, valor string) (strin
 	if err != nil {
 		return "", err
 	}
+	CacheParametros.Borrar(p.Parametro)
+	log.Printf("[CACHE INVALIDADO] Parametro '%s' borrado del caché por modificación", p.Parametro)
 	return mensaje, nil
 }

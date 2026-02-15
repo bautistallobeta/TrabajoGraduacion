@@ -1,9 +1,12 @@
 package models
 
 import (
+	"MSTransaccionesFinancieras/internal/infra/cache"
 	"MSTransaccionesFinancieras/internal/infra/persistence"
 	"database/sql"
 	"errors"
+	"log"
+	"strconv"
 	"time"
 )
 
@@ -14,11 +17,20 @@ type Monedas struct {
 	FechaAlta       time.Time `json:"FechaAlta"`
 }
 
+var CacheMonedas = cache.NewCache[Monedas](15 * time.Second)
+
 // Instancia los atributos de la moneda desde la base de datos.
 // tsp_dame_moneda
 // - tokenSesion: token de sesión del usuario
 func (m *Monedas) Dame(tokenSesion string) (string, error) {
-	rows, err := persistence.ClienteMySQL.Query("CALL tsp_dame_moneda(?)", tokenSesion)
+	clave := strconv.Itoa(m.IdMoneda)
+	if cached, ok := CacheMonedas.Dame(clave); ok {
+		*m = cached
+		log.Printf("[CACHE HIT] Moneda %s obtenida del caché", clave)
+		return "OK", nil
+	}
+
+	rows, err := persistence.ClienteMySQL.Query("CALL tsp_dame_moneda(?, ?)", tokenSesion, m.IdMoneda)
 	if err != nil {
 		return "", err
 	}
@@ -57,6 +69,8 @@ func (m *Monedas) Dame(tokenSesion string) (string, error) {
 		if mensaje != "OK" {
 			return mensaje, errors.New(mensaje)
 		}
+		CacheMonedas.Guardar(clave, *m)
+		log.Printf("[CACHE MISS] Moneda %s obtenida de MySQL y guardada en caché", clave)
 	}
 	return mensaje, nil
 }
@@ -70,6 +84,8 @@ func (m *Monedas) Activar(idCuentaEmpresa string) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	CacheMonedas.Borrar(strconv.Itoa(m.IdMoneda))
+	log.Printf("[CACHE INVALIDADO] Moneda %d borrada del caché por activación", m.IdMoneda)
 	return mensaje, nil
 }
 
@@ -82,5 +98,7 @@ func (m *Monedas) Desactivar(tokenSesion string) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	CacheMonedas.Borrar(strconv.Itoa(m.IdMoneda))
+	log.Printf("[CACHE INVALIDADO] Moneda %d borrada del caché por desactivación", m.IdMoneda)
 	return mensaje, nil
 }
