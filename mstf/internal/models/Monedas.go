@@ -8,11 +8,10 @@ import (
 )
 
 type Monedas struct {
-	IdMoneda        int            `json:"IdMoneda"`
-	Ledger          int            `json:"Ledger"`
-	IdCuentaEmpresa string         `json:"IdCuentaEmpresa"`
-	Estado          string         `json:"Estado"`
-	FechaAlta       time.Time      `json:"FechaAlta"`
+	IdMoneda        int       `json:"IdMoneda"`
+	IdCuentaEmpresa string    `json:"IdCuentaEmpresa"`
+	Estado          string    `json:"Estado"`
+	FechaAlta       time.Time `json:"FechaAlta"`
 }
 
 // Instancia los atributos de la moneda desde la base de datos.
@@ -26,12 +25,11 @@ func (m *Monedas) Dame(db *sql.DB, tokenSesion string) (string, error) {
 	defer rows.Close()
 	var mensaje string
 	var idMoneda sql.NullInt32
-	var ledger sql.NullInt32
 	var idCuentaEmpresa sql.NullString
 	var estado sql.NullString
 	var fechaAlta sql.NullTime
 	if rows.Next() {
-		err = rows.Scan(&mensaje, &idMoneda, &ledger, &idCuentaEmpresa, &estado, &fechaAlta)
+		err = rows.Scan(&mensaje, &idMoneda, &idCuentaEmpresa, &estado, &fechaAlta)
 
 		if idMoneda.Valid {
 			m.IdMoneda = int(idMoneda.Int32)
@@ -60,47 +58,6 @@ func (m *Monedas) Dame(db *sql.DB, tokenSesion string) (string, error) {
 			return mensaje, errors.New(mensaje)
 		}
 	}
-	return mensaje, nil
-}
-
-// Instancia los atributos de la moneda desde la base de datos a partir de su ledger.
-// tsp_dame_moneda_por_ledger
-// - tokenSesion: token de sesión del usuario
-// - ledger: ledger de TigerBeetle
-func (m *Monedas) DamePorLedger(db *sql.DB, tokenSesion string, ledger int) (string, error) {
-	var idMoneda sql.NullInt32
-	var mensaje string
-	var idCuentaEmpresa sql.NullString
-	var estado sql.NullString
-	var fechaAlta sql.NullTime
-	err := db.QueryRow("CALL tsp_dame_moneda_por_ledger(?, ?)", tokenSesion, ledger).Scan(&mensaje, &idMoneda, &m.Ledger, &idCuentaEmpresa, &estado, &fechaAlta)
-	if err != nil {
-		return "", err
-	}
-	if mensaje != "OK" {
-		return mensaje, errors.New(mensaje)
-	}
-	if idMoneda.Valid {
-		m.IdMoneda = int(idMoneda.Int32)
-	} else {
-		m.IdMoneda = 0
-	}
-	if idCuentaEmpresa.Valid {
-		m.IdCuentaEmpresa = idCuentaEmpresa.String
-	} else {
-		m.IdCuentaEmpresa = ""
-	}
-	if estado.Valid {
-		m.Estado = estado.String
-	} else {
-		m.Estado = ""
-	}
-	if fechaAlta.Valid {
-		m.FechaAlta = fechaAlta.Time
-	} else {
-		m.FechaAlta = time.Time{}
-	}
-
 	return mensaje, nil
 }
 

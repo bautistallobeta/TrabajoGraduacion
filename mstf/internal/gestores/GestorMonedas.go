@@ -13,7 +13,7 @@ func NewGestorMonedas(db *sql.DB) *GestorMonedas {
 	return &GestorMonedas{Db: db}
 }
 
-// Crea una moneda en estado P: Pendiente y le asocia un ledger en TigerBeetle.
+// Crea una moneda en estado P: Pendiente.
 // tsp_crear_moneda
 // - tokenSesion: token de sesión del usuario
 // - idMoneda: Id de la moneda a crear (viene de MisGastos)
@@ -42,7 +42,7 @@ func (gm *GestorMonedas) Listar(tokenSesion string, incluyeBajas string) ([]mode
 	var monedas []models.Monedas
 	for rows.Next() {
 		var m models.Monedas
-		err = rows.Scan(&m.IdMoneda, &m.Ledger, &m.IdCuentaEmpresa, &m.Estado, &m.FechaAlta)
+		err = rows.Scan(&m.IdMoneda, &m.IdCuentaEmpresa, &m.Estado, &m.FechaAlta)
 		if err != nil {
 			return nil, err
 		}
