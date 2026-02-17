@@ -15,44 +15,106 @@ import (
 	"MSTransaccionesFinancieras/internal/infra/kafkamstf"
 	"MSTransaccionesFinancieras/internal/infra/persistence"
 	"MSTransaccionesFinancieras/internal/infra/webhook"
+	"MSTransaccionesFinancieras/internal/utils"
 
 	"github.com/tigerbeetle/tigerbeetle-go/pkg/types"
 )
 
-// función (de momnto hardcodeada) para inicializar cuenta "empresa"
-// TODO: inicializar una cuenta empresa por c/ledger en db relacional
-func inicializarCuentaEmpresa() {
-	log.Println("Inicializando cuenta empresa (ID=1)...")
+// Inicializa las cuentas empresa en TigerBeetle para cada moneda activa.
+// Lee las monedas activas de MySQL, verifica cuáles ya existen en TB (un solo lookup),
+// y crea las faltantes en un solo llamado a TB.
+func inicializarCuentasEmpresa() error {
+	log.Println("Inicializando cuentas empresa...")
 
-	// ID fijo: 1
-	idCuentaEmpresa := types.ToUint128(1)
-
-	cuentas, err := persistence.ClienteTB.LookupAccounts([]types.Uint128{idCuentaEmpresa})
+	// Listar monedas activas desde MySQL
+	// TODO: eliminar hardcodeo de token
+	gm := gestores.NewGestorMonedas()
+	monedas, err := gm.Listar("cf904666e02a79cfd50b074ab3c360c0", "N")
 	if err != nil {
-		log.Fatalf("FATAL: Error al verificar cuenta empresa: %v", err)
+		log.Printf("ERROR [inicializarCuentasEmpresa]: No se pudieron listar monedas activas: %v", err)
+		return err
 	}
-	if len(cuentas) > 0 {
-		return
-	}
-
-	cuentaEmpresa := types.Account{
-		ID:         idCuentaEmpresa,
-		Ledger:     1,   // Ledger 1 de momento)
-		Code:       999, // Código hardcodeado para diferenciar cuenta empresa
-		UserData64: 0,
-		UserData32: 0,
-		Flags: types.AccountFlags{
-			DebitsMustNotExceedCredits: false, // permitir saldo negativo
-			History:                    true,  // Habilita historial para auditoría (a definir - TODO)
-		}.ToUint16(),
+	if len(monedas) == 0 {
+		log.Println("No hay monedas activas. No se inicializan cuentas empresa.")
+		return nil
 	}
 
-	_, err = persistence.ClienteTB.CreateAccounts([]types.Account{cuentaEmpresa})
+	// Armar array de IDs de cuentas empresa para consultar a TB en un solo llamado
+	type monedaPendiente struct {
+		idMoneda  int
+		fechaAlta string
+	}
+	var ids []types.Uint128
+	pendientes := make(map[types.Uint128]monedaPendiente)
+
+	for _, m := range monedas {
+		if m.IdCuentaEmpresa == "" {
+			log.Printf("ADVERTENCIA: Moneda %d activa sin IdCuentaEmpresa, omitiendo", m.IdMoneda)
+			continue
+		}
+		tbId, err := utils.ParsearUint128(m.IdCuentaEmpresa)
+		if err != nil {
+			log.Printf("ADVERTENCIA: IdCuentaEmpresa '%s' inválido para moneda %d, omitiendo", m.IdCuentaEmpresa, m.IdMoneda)
+			continue
+		}
+		ids = append(ids, tbId)
+		pendientes[tbId] = monedaPendiente{
+			idMoneda:  m.IdMoneda,
+			fechaAlta: m.FechaAlta.Format("2006-01-02"),
+		}
+	}
+
+	if len(ids) == 0 {
+		log.Println("No hay cuentas empresa para verificar.")
+		return nil
+	}
+
+	// Consultar TB en un solo llamado
+	cuentasExistentes, err := persistence.ClienteTB.LookupAccounts(ids)
+	log.Printf("Cuentas empresa encontradas en TB: %d de %d", len(cuentasExistentes), len(ids))
+	log.Printf("IDs de cuentas empresa pendientes de creación: %v", ids)
+
 	if err != nil {
-		log.Fatalf("FATAL: Error al crear cuenta empresa: %v", err)
+		log.Printf("ERROR [inicializarCuentasEmpresa]: No se pudieron consultar cuentas empresa en TigerBeetle: %v", err)
+		return err
 	}
 
-	log.Println("Cuenta empresa creada exitosamente (ID=1)")
+	// Marcar las que ya existen
+	existe := make(map[types.Uint128]bool)
+	for _, c := range cuentasExistentes {
+		existe[c.ID] = true
+	}
+
+	// Armar lote de cuentas faltantes
+	var faltantes []gestores.CuentaNueva
+	for _, tbId := range ids {
+		if existe[tbId] {
+			continue
+		}
+		mp := pendientes[tbId]
+		faltantes = append(faltantes, gestores.CuentaNueva{
+			IdMoneda:                      uint32(mp.idMoneda),
+			IdUsuarioFinal:                0,
+			FechaAlta:                     mp.fechaAlta,
+			DebitosNoDebenExcederCreditos: false,
+		})
+	}
+
+	if len(faltantes) == 0 {
+		log.Println("Todas las cuentas empresa ya existen en TigerBeetle.")
+		return nil
+	}
+
+	// Crear las faltantes en un solo llamado
+	log.Printf("Creando %d cuentas empresa faltantes...", len(faltantes))
+	gc := gestores.NewGestorCuentas()
+	idsCreados, err := gc.CrearLote(faltantes)
+	if err != nil {
+		log.Printf("ERROR [inicializarCuentasEmpresa]: No se pudieron crear cuentas empresa: %v", err)
+		return err
+	}
+	log.Printf("Cuentas empresa creadas exitosamente: %v", idsCreados)
+	return nil
 }
 
 func main() {
@@ -68,8 +130,11 @@ func main() {
 		log.Fatalf("FATAL: No se pudo conectar a MySQL: %v", err)
 	}
 
-	// TODO: corregir creacipon de cuentas empresa - de momento hardcodeado
-	inicializarCuentaEmpresa()
+	// Inicializar cuentas empresa para cada moneda activa
+	err := inicializarCuentasEmpresa()
+	if err != nil {
+		log.Fatalf("FATAL: No se pudo inicializar cuentas empresa: %v", err)
+	}
 
 	// Notificador Webhook
 	notificador := webhook.NewNotificador(cfg)
