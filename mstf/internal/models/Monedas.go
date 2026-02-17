@@ -4,8 +4,6 @@ import (
 	"MSTransaccionesFinancieras/internal/infra/cache"
 	"MSTransaccionesFinancieras/internal/infra/persistence"
 	"database/sql"
-	"errors"
-	"log"
 	"strconv"
 	"time"
 )
@@ -17,7 +15,7 @@ type Monedas struct {
 	FechaAlta       time.Time `json:"FechaAlta"`
 }
 
-var CacheMonedas = cache.NewCache[Monedas](15 * time.Second)
+var CacheMonedas = cache.NewCache[Monedas](30 * time.Minute)
 
 // Instancia los atributos de la moneda desde la base de datos.
 // tsp_dame_moneda
@@ -26,7 +24,6 @@ func (m *Monedas) Dame(tokenSesion string) (string, error) {
 	clave := strconv.Itoa(m.IdMoneda)
 	if cached, ok := CacheMonedas.Dame(clave); ok {
 		*m = cached
-		log.Printf("[CACHE HIT] Moneda %s obtenida del caché", clave)
 		return "OK", nil
 	}
 
@@ -67,25 +64,23 @@ func (m *Monedas) Dame(tokenSesion string) (string, error) {
 			return mensaje, err
 		}
 		if mensaje != "OK" {
-			return mensaje, errors.New(mensaje)
+			return mensaje, nil
 		}
 		CacheMonedas.Guardar(clave, *m)
-		log.Printf("[CACHE MISS] Moneda %s obtenida de MySQL y guardada en caché", clave)
 	}
 	return mensaje, nil
 }
 
 // Activa una moneda pendiente asignando la cuenta empresa.
 // tsp_activar_moneda
-// - idCuentaEmpresa: Id de la cuenta empresa en TigerBeetle
-func (m *Monedas) Activar(idCuentaEmpresa string) (string, error) {
+// - tokenSesion: token de sesión del usuario
+func (m *Monedas) Activar(tokenSesion string) (string, error) {
 	var mensaje string
-	err := persistence.ClienteMySQL.QueryRow("CALL tsp_activar_moneda(?, ?)", idCuentaEmpresa, m.IdMoneda).Scan(&mensaje)
+	err := persistence.ClienteMySQL.QueryRow("CALL tsp_activar_moneda(?, ?)", tokenSesion, m.IdMoneda).Scan(&mensaje)
 	if err != nil {
 		return "", err
 	}
 	CacheMonedas.Borrar(strconv.Itoa(m.IdMoneda))
-	log.Printf("[CACHE INVALIDADO] Moneda %d borrada del caché por activación", m.IdMoneda)
 	return mensaje, nil
 }
 
@@ -99,6 +94,5 @@ func (m *Monedas) Desactivar(tokenSesion string) (string, error) {
 		return "", err
 	}
 	CacheMonedas.Borrar(strconv.Itoa(m.IdMoneda))
-	log.Printf("[CACHE INVALIDADO] Moneda %d borrada del caché por desactivación", m.IdMoneda)
 	return mensaje, nil
 }

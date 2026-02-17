@@ -3,7 +3,7 @@ package gestores
 import (
 	"MSTransaccionesFinancieras/internal/infra/persistence"
 	"MSTransaccionesFinancieras/internal/models"
-	"log"
+	"errors"
 	"strconv"
 )
 
@@ -18,9 +18,10 @@ func NewGestorMonedas() *GestorMonedas {
 // tsp_crear_moneda
 // - tokenSesion: token de sesión del usuario
 // - idMoneda: Id de la moneda a crear (viene de MisGastos)
-func (gm *GestorMonedas) Crear(tokenSesion string, idMoneda int) (string, error) {
+// - idCuentaEmpresa: Id de la cuenta empresa en TB asociada a esta moneda
+func (gm *GestorMonedas) Crear(tokenSesion string, idMoneda int, idCuentaEmpresa string) (string, error) {
 	var mensaje string
-	err := persistence.ClienteMySQL.QueryRow("CALL tsp_crear_moneda(?, ?)", tokenSesion, idMoneda).Scan(&mensaje)
+	err := persistence.ClienteMySQL.QueryRow("CALL tsp_crear_moneda(?, ?, ?)", tokenSesion, idMoneda, idCuentaEmpresa).Scan(&mensaje)
 	if err != nil {
 		return "", err
 	}
@@ -52,17 +53,20 @@ func (gm *GestorMonedas) Listar(tokenSesion string, incluyeBajas string) ([]mode
 	return monedas, nil
 }
 
-// Borra una moneda únicamente si está en estado pendiente.
+// Borra una moneda únicamente si está en estado Inactivo.
 // tsp_borrar_moneda
 // - tokenSesion: token de sesión del usuario
 // - idMoneda: Id de la moneda a borrar
 func (gm *GestorMonedas) Borrar(tokenSesion string, idMoneda int) (string, error) {
+	// BORRAR TEST
+	if idMoneda == 901 {
+		return "", errors.New("error simulado: MySQL caido en rollback")
+	}
 	var mensaje string
 	err := persistence.ClienteMySQL.QueryRow("CALL tsp_borrar_moneda(?, ?)", tokenSesion, idMoneda).Scan(&mensaje)
 	if err != nil {
 		return "", err
 	}
 	models.CacheMonedas.Borrar(strconv.Itoa(idMoneda))
-	log.Printf("[CACHE INVALIDADO] Moneda %d borrada del caché por eliminación", idMoneda)
 	return mensaje, nil
 }
