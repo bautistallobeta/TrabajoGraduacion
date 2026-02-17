@@ -10,9 +10,10 @@ import (
 // resultado final de una transferencia procesada.
 type TransferenciaNotificada struct {
 	IdTransferencia string    `json:"IdTransferencia"`
-	IdUsuarioFinal  string    `json:"IdUsuarioFinal"`
+	IdUsuarioFinal  uint64    `json:"IdUsuarioFinal"`
 	Monto           string    `json:"Monto"`
 	IdMoneda        uint32    `json:"IdMoneda"`
+	Tipo            string    `json:"Tipo"`
 	Categoria       uint64    `json:"Categoria"`
 	Estado          string    `json:"Estado"`
 	Mensaje         string    `json:"Mensaje"`
@@ -37,7 +38,8 @@ func NewTransferenciaNotificada(transfer types.Transfer, kafkaMsg KafkaTransfere
 		IdUsuarioFinal:  kafkaMsg.IdUsuarioFinal,
 		Monto:           utils.Uint128AStringDecimal(transfer.Amount),
 		IdMoneda:        transfer.Ledger,
-		Categoria:       uint64(transfer.Code),
+		Tipo:            kafkaMsg.Tipo,
+		Categoria:       kafkaMsg.IdCategoria,
 		Estado:          estado,
 		Mensaje:         mensaje,
 		FechaProceso:    time.Now(),
@@ -51,7 +53,8 @@ func NewTransferenciaNotificadaError(transfer types.Transfer, kafkaMsg KafkaTran
 		IdUsuarioFinal:  kafkaMsg.IdUsuarioFinal,
 		Monto:           utils.Uint128AStringDecimal(transfer.Amount),
 		IdMoneda:        transfer.Ledger,
-		Categoria:       uint64(transfer.Code),
+		Tipo:            kafkaMsg.Tipo,
+		Categoria:       kafkaMsg.IdCategoria,
 		Estado:          "E",
 		Mensaje:         mensajeError,
 		FechaProceso:    time.Now(),

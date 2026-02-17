@@ -129,7 +129,8 @@ func (gc *GestorCuentas) Crear(idMoneda uint32, idUsuarioFinal uint64, fechaAlta
 	if _, err := moneda.Dame("cf904666e02a79cfd50b074ab3c360c0"); err != nil {
 		return "", errors.New("La moneda no existe o no está activa")
 	}
-	if moneda.Estado != "A" {
+	// Chequeo que se hace solo si la cuenta no es cuentaempresa
+	if debitosNoDebenExcederCreditos && moneda.Estado != "A" {
 		return "", errors.New("La moneda no existe o no está activa")
 	}
 

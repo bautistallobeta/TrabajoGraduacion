@@ -131,42 +131,73 @@ func (c *Consumidor) armarLoteDesdeKafka(ctx context.Context) ([]kafka.Message, 
 	return mensajesLote, transferenciasLote, kafkaMsgsLote
 }
 
-// Mensaje de Kafka a Transfer de TigerBeetle
+// Mensaje de Kafka a Transfer de TigerBeetle.
+// Construye DebitAccountID y CreditAccountID a partir de IdUsuarioFinal, IdMoneda y Tipo (I/E).
 func (c *Consumidor) parseKafkaMessage(msg kafka.Message) (types.Transfer, models.KafkaTransferencias, error) {
 	var kafkaMsg models.KafkaTransferencias
 
 	if err := json.Unmarshal(msg.Value, &kafkaMsg); err != nil {
 		return types.Transfer{}, kafkaMsg, errors.New("fallo al parsear JSON: " + err.Error())
 	}
-	if kafkaMsg.IdTransferencia == "" || kafkaMsg.IdCuentaDebito == "" || kafkaMsg.IdCuentaCredito == "" {
-		return types.Transfer{}, kafkaMsg, errors.New("IDs de transferencia o cuentas están vacíos")
+	if kafkaMsg.IdTransferencia == "" {
+		return types.Transfer{}, kafkaMsg, errors.New("IdTransferencia está vacío")
+	}
+	if kafkaMsg.IdUsuarioFinal == 0 {
+		return types.Transfer{}, kafkaMsg, errors.New("IdUsuarioFinal no puede ser cero")
 	}
 	if kafkaMsg.Monto == 0 {
 		return types.Transfer{}, kafkaMsg, errors.New("monto no puede ser cero")
+	}
+	if kafkaMsg.Tipo != "I" && kafkaMsg.Tipo != "E" {
+		return types.Transfer{}, kafkaMsg, errors.New("Tipo debe ser 'I' (ingreso) o 'E' (egreso)")
 	}
 
 	idTransferenciaCast, err := utils.ParsearUint128(kafkaMsg.IdTransferencia)
 	if err != nil {
 		return types.Transfer{}, kafkaMsg, errors.New("IdTransferencia formato incorrecto")
 	}
-	idDebitoCast, err := utils.ParsearUint128(kafkaMsg.IdCuentaDebito)
+
+	// Construir ID de cuenta usuario: concatenación de IdMoneda + IdUsuarioFinal
+	idCuentaUsuarioStr := utils.ConcatenarIDString(uint64(kafkaMsg.IdMoneda), kafkaMsg.IdUsuarioFinal)
+	idCuentaUsuario, err := utils.ParsearUint128(idCuentaUsuarioStr)
 	if err != nil {
-		return types.Transfer{}, kafkaMsg, errors.New("IdCuentaDebito formato incorrecto")
+		return types.Transfer{}, kafkaMsg, errors.New("no se pudo construir ID de cuenta usuario")
 	}
-	idCreditoCast, err := utils.ParsearUint128(kafkaMsg.IdCuentaCredito)
+
+	// Obtener IdCuentaEmpresa de la moneda
+	// TODO: eliminar hardcodeo de token
+	moneda := &models.Monedas{IdMoneda: int(kafkaMsg.IdMoneda)}
+	if _, err := moneda.Dame("cf904666e02a79cfd50b074ab3c360c0"); err != nil {
+		return types.Transfer{}, kafkaMsg, errors.New("no se pudo obtener la moneda: " + err.Error())
+	}
+	if moneda.IdCuentaEmpresa == "" {
+		return types.Transfer{}, kafkaMsg, errors.New("la moneda no tiene cuenta empresa configurada")
+	}
+	idCuentaEmpresa, err := utils.ParsearUint128(moneda.IdCuentaEmpresa)
 	if err != nil {
-		return types.Transfer{}, kafkaMsg, errors.New("IdCuentaCredito formato incorrecto")
+		return types.Transfer{}, kafkaMsg, errors.New("IdCuentaEmpresa formato incorrecto: " + err.Error())
+	}
+
+	// Asignar débito/crédito según Tipo
+	var debitAccountID, creditAccountID types.Uint128
+	if kafkaMsg.Tipo == "E" {
+		// Egreso: sale del usuario, entra a la empresa
+		debitAccountID = idCuentaUsuario
+		creditAccountID = idCuentaEmpresa
+	} else {
+		// Ingreso: sale de la empresa, entra al usuario
+		debitAccountID = idCuentaEmpresa
+		creditAccountID = idCuentaUsuario
 	}
 
 	timeStamp, _ := utils.FechaAUserData128(kafkaMsg.Fecha)
-	log.Printf("Fecha parseada a UserData128: %s -> %s", kafkaMsg.Fecha, timeStamp.String())
 	transferencia := types.Transfer{
 		ID:              idTransferenciaCast,
-		DebitAccountID:  idDebitoCast,
-		CreditAccountID: idCreditoCast,
+		DebitAccountID:  debitAccountID,
+		CreditAccountID: creditAccountID,
 		Amount:          types.ToUint128(kafkaMsg.Monto),
 		Ledger:          kafkaMsg.IdMoneda,
-		Code:            1, // Código hardcodeadeo (TODO: definir qué hacer con el code)
+		Code:            1, // Código hardcodeado (TODO: definir qué hacer con el code)
 		UserData64:      kafkaMsg.IdCategoria,
 		UserData128:     timeStamp,
 	}

@@ -52,8 +52,14 @@ func (tc *TransferenciasControlador) Crear(c echo.Context) error {
 	if req.IdMoneda <= 0 {
 		return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta("IdMoneda debe ser mayor a cero"))
 	}
-	if req.IdTransferencia == "" || req.IdCuentaDebito == "" || req.IdCuentaCredito == "" {
-		return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta("IdTransferencia, IdCuentaDebito e IdCuentaCredito son obligatorios"))
+	if req.IdTransferencia == "" {
+		return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta("IdTransferencia es obligatorio"))
+	}
+	if req.IdUsuarioFinal == 0 {
+		return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta("IdUsuarioFinal es obligatorio"))
+	}
+	if req.Tipo != "I" && req.Tipo != "E" {
+		return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta("Tipo debe ser 'I' (ingreso) o 'E' (egreso)"))
 	}
 
 	//Publish de la transferencia en Kafka
