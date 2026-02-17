@@ -25,12 +25,14 @@ type Cuentas struct {
 const LimiteHistorialBalances uint32 = 100
 
 func (c *Cuentas) Dame() error {
-	idCuentaCast, err := utils.ParsearUint128(c.IdCuenta)
-	if err != nil {
-		return errors.New("IdCuenta formato incorrecto: " + err.Error())
+	if c.IdUsuarioFinal <= 0 || c.IdMoneda <= 0 {
+		return errors.New("IdUsuarioFinal e IdMoneda son requeridos y deben ser mayores a cero")
 	}
-	if idCuentaCast == (types.Uint128{}) || idCuentaCast == types.ToUint128(0) {
-		return errors.New("IdCuenta no puede ser nulo ni cero")
+
+	idCuentaStr := utils.ConcatenarIDString(uint64(c.IdMoneda), c.IdUsuarioFinal)
+	idCuentaCast, err := utils.ParsearUint128(idCuentaStr)
+	if err != nil {
+		return errors.New("Error al construir IdCuenta: " + err.Error())
 	}
 
 	if persistence.ClienteTB == nil {
@@ -48,6 +50,7 @@ func (c *Cuentas) Dame() error {
 
 	cuentaTB := accounts[0]
 
+	c.IdCuenta = utils.Uint128AStringDecimal(cuentaTB.ID)
 	c.IdUsuarioFinal = cuentaTB.UserData64
 	c.IdMoneda = cuentaTB.Ledger
 	c.Creditos = utils.Uint128AStringDecimal(cuentaTB.CreditsPosted)
@@ -89,19 +92,15 @@ func (c *Cuentas) Desactivar() (string, error) {
 	return "Desactivada", nil
 }
 
-// TODO: comentario de método de clase
 func (c *Cuentas) DameHistorialBalances(timestampMin uint64, timestampMax uint64, limite uint32) ([]types.AccountBalance, error) {
-	if c.IdCuenta == "" {
-		return nil, errors.New("IdCuenta no puede estar vacío")
+	if c.IdUsuarioFinal <= 0 || c.IdMoneda <= 0 {
+		return nil, errors.New("IdUsuarioFinal e IdMoneda son requeridos y deben ser mayores a cero")
 	}
 
-	idCuentaCast, err := utils.ParsearUint128(c.IdCuenta)
+	idCuentaStr := utils.ConcatenarIDString(uint64(c.IdMoneda), c.IdUsuarioFinal)
+	idCuentaCast, err := utils.ParsearUint128(idCuentaStr)
 	if err != nil {
-		return nil, errors.New("IdCuenta formato incorrecto")
-	}
-
-	if idCuentaCast == (types.Uint128{}) || idCuentaCast == types.ToUint128(0) {
-		return nil, errors.New("IdCuenta no puede ser nulo ni cero")
+		return nil, errors.New("Error al construir IdCuenta: " + err.Error())
 	}
 
 	if persistence.ClienteTB == nil {

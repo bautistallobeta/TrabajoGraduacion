@@ -117,7 +117,7 @@ func (uc *UsuariosControlador) ReestablecerPassword(c echo.Context) error {
 	if err := c.Bind(req); err != nil {
 		return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta("Parámetros inválidos: "+err.Error()))
 	}
-	if req.IdUsuario == 0 {
+	if req.IdUsuario <= 0 {
 		return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta("IdUsuario es campo obligatorio"))
 	}
 	mensaje, passTemporal, err := uc.Gestor.RestablecerPassword(tokenSesion, req.IdUsuario)
@@ -139,7 +139,7 @@ func (uc *UsuariosControlador) Dame(c echo.Context) error {
 	if err := c.Bind(req); err != nil {
 		return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta("Parámetros inválidos: "+err.Error()))
 	}
-	if req.IdUsuario == 0 {
+	if req.IdUsuario <= 0 {
 		return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta("IdUsuario es campo obligatorio"))
 	}
 	usuario := &models.Usuarios{IdUsuario: req.IdUsuario}
@@ -185,7 +185,7 @@ func (uc *UsuariosControlador) Activar(c echo.Context) error {
 	if err := c.Bind(req); err != nil {
 		return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta("Parámetros inválidos: "+err.Error()))
 	}
-	if req.IdUsuario == 0 {
+	if req.IdUsuario <= 0 {
 		return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta("IdUsuario es campo obligatorio"))
 	}
 	usuario := &models.Usuarios{IdUsuario: req.IdUsuario}
@@ -208,7 +208,7 @@ func (uc *UsuariosControlador) Desactivar(c echo.Context) error {
 	if err := c.Bind(req); err != nil {
 		return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta("Parámetros inválidos: "+err.Error()))
 	}
-	if req.IdUsuario == 0 {
+	if req.IdUsuario <= 0 {
 		return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta("IdUsuario es campo obligatorio"))
 	}
 	usuario := &models.Usuarios{IdUsuario: req.IdUsuario}
@@ -233,7 +233,7 @@ func (uc *UsuariosControlador) ConfirmarUsuario(c echo.Context) error {
 	if err := c.Bind(req); err != nil {
 		return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta("Parámetros inválidos: "+err.Error()))
 	}
-	if req.IdUsuario == 0 {
+	if req.IdUsuario <= 0 {
 		return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta("IdUsuario es campo obligatorio"))
 	}
 	if req.Password == "" || req.ConfirmarPassword == "" {

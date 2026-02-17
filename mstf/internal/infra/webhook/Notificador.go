@@ -22,12 +22,12 @@ func NewNotificador(cfg config.Config) *Notificador {
 	return &Notificador{cfg: cfg}
 }
 
-func (n *Notificador) NotificarTransferencias(transfers []types.Transfer, results []types.TransferEventResult) error {
+func (n *Notificador) NotificarTransferencias(transfers []types.Transfer, kafkaMsgs []models.KafkaTransferencias, results []types.TransferEventResult, fallidas []models.TransferenciaNotificada) error {
 	resultadosTransferenciaMap := make(map[uint32]types.TransferEventResult)
 	for _, res := range results {
 		resultadosTransferenciaMap[res.Index] = res
 	}
-	notificaciones := make([]models.TransferenciaNotificada, 0, len(transfers))
+	notificaciones := make([]models.TransferenciaNotificada, 0, len(transfers)+len(fallidas))
 	for i, t := range transfers {
 		var result types.TransferEventResult
 		if res, exists := resultadosTransferenciaMap[uint32(i)]; exists {
@@ -36,9 +36,13 @@ func (n *Notificador) NotificarTransferencias(transfers []types.Transfer, result
 			result.Result = types.TransferOK
 		}
 
-		notificacion := models.NewTransferenciaNotificada(t, result)
+		notificacion := models.NewTransferenciaNotificada(t, kafkaMsgs[i], result)
 		notificaciones = append(notificaciones, notificacion)
 	}
+
+	// Agregar transferencias rechazadas por validación previa (no fueron a TigerBeetle)
+	notificaciones = append(notificaciones, fallidas...)
+
 	payload := models.LoteNotificado{
 		CantidadProcesada: len(notificaciones),
 		Transferencias:    notificaciones,

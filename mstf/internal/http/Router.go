@@ -39,14 +39,14 @@ func initRoutes(router *echo.Echo, notificador *webhook.Notificador, productor *
 	usuariosControlador := controllers.NewUsuariosControlador(gestorUsuarios)
 	paramControlador := controllers.NewParametrosControlador()
 	gestorMonedas := gestores.NewGestorMonedas()
-	monedasControlador := controllers.NewMonedasControlador(gestorMonedas)
+	monedasControlador := controllers.NewMonedasControlador(gestorMonedas, gestorCuentas)
 
 	// Endpoint de prueba
 	router.GET("/ping", mainControlador.Ping)
 
 	// Cuentas
-	router.GET("/cuentas/:idcuenta/historial", cuentasControlador.DameHistorial)
-	router.GET("/cuentas/:idcuenta", cuentasControlador.Dame)
+	router.GET("/cuentas/:idusuariofinal/:idmoneda/historial", cuentasControlador.DameHistorial)
+	router.GET("/cuentas/:idusuariofinal/:idmoneda", cuentasControlador.Dame)
 	router.POST("/cuentas", cuentasControlador.Crear)
 	router.GET("/cuentas", cuentasControlador.Buscar)
 
@@ -76,6 +76,7 @@ func initRoutes(router *echo.Echo, notificador *webhook.Notificador, productor *
 	router.POST("/monedas", monedasControlador.Crear)
 	router.DELETE("/monedas/:idmoneda", monedasControlador.Borrar)
 	router.GET("/monedas", monedasControlador.Listar)
-	router.PUT("/monedas/:idmoneda/desactivar", monedasControlador.Desctivar)
+	router.PUT("/monedas/:idmoneda/desactivar", monedasControlador.Desactivar)
+	router.PUT("/monedas/:idmoneda/activar", monedasControlador.Activar)
 
 }

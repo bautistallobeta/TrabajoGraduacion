@@ -4,8 +4,6 @@ import (
 	"MSTransaccionesFinancieras/internal/infra/cache"
 	"MSTransaccionesFinancieras/internal/infra/persistence"
 	"database/sql"
-	"errors"
-	"log"
 	"time"
 )
 
@@ -16,7 +14,7 @@ type Parametros struct {
 	EsModificable string `json:"EsModificable"`
 }
 
-var CacheParametros = cache.NewCache[Parametros](15 * time.Second)
+var CacheParametros = cache.NewCache[Parametros](30 * time.Minute)
 
 // Devuelve los datos de un parámetro específico por su clave.
 // tsp_dame_parametro
@@ -25,7 +23,6 @@ var CacheParametros = cache.NewCache[Parametros](15 * time.Second)
 func (p *Parametros) Dame(tokenSesion string) (string, error) {
 	if cached, ok := CacheParametros.Dame(p.Parametro); ok {
 		*p = cached
-		log.Printf("[CACHE HIT] Parametro '%s' obtenido del caché", p.Parametro)
 		return "OK", nil
 	}
 
@@ -65,10 +62,9 @@ func (p *Parametros) Dame(tokenSesion string) (string, error) {
 			p.EsModificable = ""
 		}
 		CacheParametros.Guardar(p.Parametro, *p)
-		log.Printf("[CACHE MISS] Parametro '%s' obtenido de MySQL y guardado en caché", p.Parametro)
 		return mensaje, nil
 	}
-	return mensaje, errors.New("Error al obtener el parámetro")
+	return mensaje, nil
 }
 
 //	Permite buscar los parámetros del sistema según su nombre. Si pSoloModificables es 'S', muestra solo los
@@ -107,6 +103,5 @@ func (p *Parametros) ModificarParametro(tokenSesion string, valor string) (strin
 		return "", err
 	}
 	CacheParametros.Borrar(p.Parametro)
-	log.Printf("[CACHE INVALIDADO] Parametro '%s' borrado del caché por modificación", p.Parametro)
 	return mensaje, nil
 }

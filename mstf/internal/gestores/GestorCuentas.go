@@ -5,10 +5,18 @@ import (
 	"MSTransaccionesFinancieras/internal/models"
 	"MSTransaccionesFinancieras/internal/utils"
 	"errors"
+	"fmt"
 	"log"
 
 	"github.com/tigerbeetle/tigerbeetle-go/pkg/types"
 )
+
+type CuentaNueva struct {
+	IdMoneda                      uint32
+	IdUsuarioFinal                uint64
+	FechaAlta                     string
+	DebitosNoDebenExcederCreditos bool
+}
 
 type GestorCuentas struct {
 }
@@ -23,7 +31,7 @@ func NewGestorCuentas() *GestorCuentas {
 // limit: máximo número de cuentas a retornar (0 = sin límite).
 func (gc *GestorCuentas) Buscar(
 	idUsuarioFinal uint64,
-	idLedger uint32,
+	idMoneda uint32,
 	estado string,
 	limit uint32,
 ) ([]types.Account, error) {
@@ -59,7 +67,7 @@ func (gc *GestorCuentas) Buscar(
 			UserData64:   idUsuarioFinal,
 			UserData32:   0,
 			Code:         0,
-			Ledger:       idLedger,
+			Ledger:       idMoneda,
 			TimestampMin: timestampMin,
 			TimestampMax: 0,
 			Limit:        currentBatchSize,
@@ -110,13 +118,23 @@ func (gc *GestorCuentas) Buscar(
 }
 
 // TODO: agregar comentario de método de clase
-func (gc *GestorCuentas) Crear(idLedger uint32, idUsuarioFinal uint64, fechaAlta string, debitosNoDebenExcederCreditos bool) (string, error) {
+func (gc *GestorCuentas) Crear(idMoneda uint32, idUsuarioFinal uint64, fechaAlta string, debitosNoDebenExcederCreditos bool) (string, error) {
 	if persistence.ClienteTB == nil {
 		return "", errors.New("Conexión a TigerBeetle no inicializada")
 	}
 
-	// idLedger son los 64 bits mas significativa y idUsuarioFinal los menos significativa
-	idCuenta := utils.ConcatenarIDString(uint64(idLedger), idUsuarioFinal)
+	// Verificar que la moneda exista y esté activa
+	// TODO: el token está hardcodeado, reemplazar cuando se resuelva cómo obtenerlo en esta capa
+	moneda := &models.Monedas{IdMoneda: int(idMoneda)}
+	if _, err := moneda.Dame("cf904666e02a79cfd50b074ab3c360c0"); err != nil {
+		return "", errors.New("La moneda no existe o no está activa")
+	}
+	if moneda.Estado != "A" {
+		return "", errors.New("La moneda no existe o no está activa")
+	}
+
+	// idMoneda son los 64 bits mas significativos y idUsuarioFinal los menos significativos
+	idCuenta := utils.ConcatenarIDString(uint64(idMoneda), idUsuarioFinal)
 	if idCuenta == "" || idCuenta == "0" {
 		return "", errors.New("IdCuenta no puede ser vacío o cero")
 	}
@@ -133,7 +151,7 @@ func (gc *GestorCuentas) Crear(idLedger uint32, idUsuarioFinal uint64, fechaAlta
 
 	cuentaTB := types.Account{
 		ID:         tbId,
-		Ledger:     idLedger,
+		Ledger:     idMoneda,
 		Code:       1,
 		UserData64: idUsuarioFinal,
 		UserData32: fechaAltaUint32,
@@ -151,6 +169,79 @@ func (gc *GestorCuentas) Crear(idLedger uint32, idUsuarioFinal uint64, fechaAlta
 		return "", errors.New("fallo en la creación de la cuenta: " + results[0].Result.String())
 	}
 	return idCuenta, nil
+}
+
+// Crea múltiples cuentas en TigerBeetle en un solo llamado.
+// Recibe los mismos datos que Crear pero como array.
+func (gc *GestorCuentas) CrearLote(cuentas []CuentaNueva) ([]string, error) {
+	if persistence.ClienteTB == nil {
+		return nil, errors.New("Conexión a TigerBeetle no inicializada")
+	}
+	if len(cuentas) == 0 {
+		return []string{}, nil
+	}
+
+	// Verificar que la moneda de cada cuenta exista y esté activa
+	// TODO: el token está hardcodeado, reemplazar cuando se resuelva cómo obtenerlo en esta capa
+	for _, c := range cuentas {
+		moneda := &models.Monedas{IdMoneda: int(c.IdMoneda)}
+		if _, err := moneda.Dame("cf904666e02a79cfd50b074ab3c360c0"); err != nil {
+			return nil, fmt.Errorf("La moneda no existe o no está activa (IdMoneda=%d)", c.IdMoneda)
+		}
+		if moneda.Estado != "A" {
+			return nil, fmt.Errorf("La moneda no existe o no está activa (IdMoneda=%d)", c.IdMoneda)
+		}
+	}
+
+	cuentasTB := make([]types.Account, 0, len(cuentas))
+	ids := make([]string, 0, len(cuentas))
+
+	for _, c := range cuentas {
+		idCuenta := utils.ConcatenarIDString(uint64(c.IdMoneda), c.IdUsuarioFinal)
+		if idCuenta == "" || idCuenta == "0" {
+			return nil, fmt.Errorf("IdCuenta no puede ser vacío o cero (IdMoneda=%d, Usuario=%d)", c.IdMoneda, c.IdUsuarioFinal)
+		}
+
+		tbId, err := utils.ParsearUint128(idCuenta)
+		if err != nil {
+			return nil, fmt.Errorf("IdCuenta formato incorrecto (IdMoneda=%d, Usuario=%d)", c.IdMoneda, c.IdUsuarioFinal)
+		}
+
+		fechaAltaUint32, err := utils.FechaAUserData32(c.FechaAlta)
+		if err != nil {
+			return nil, fmt.Errorf("Formato de FechaAlta inválido para cuenta IdMoneda=%d: %v", c.IdMoneda, err)
+		}
+
+		cuentaTB := types.Account{
+			ID:         tbId,
+			Ledger:     c.IdMoneda,
+			Code:       1,
+			UserData64: c.IdUsuarioFinal,
+			UserData32: fechaAltaUint32,
+			Flags: types.AccountFlags{
+				DebitsMustNotExceedCredits: c.DebitosNoDebenExcederCreditos,
+				History:                    true,
+			}.ToUint16(),
+		}
+
+		cuentasTB = append(cuentasTB, cuentaTB)
+		ids = append(ids, idCuenta)
+	}
+
+	results, err := persistence.ClienteTB.CreateAccounts(cuentasTB)
+	if err != nil {
+		return nil, errors.New("error de comunicación con TigerBeetle")
+	}
+	if len(results) > 0 {
+		for _, r := range results {
+			if int(r.Index) < len(ids) {
+				log.Printf("ERROR [GestorCuentas.CrearLote]: Cuenta %s falló: %s", ids[r.Index], r.Result.String())
+			}
+		}
+		return nil, fmt.Errorf("fallo en la creación de %d de %d cuentas", len(results), len(cuentas))
+	}
+
+	return ids, nil
 }
 
 // TODO

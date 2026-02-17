@@ -10,33 +10,50 @@ import (
 // resultado final de una transferencia procesada.
 type TransferenciaNotificada struct {
 	IdTransferencia string    `json:"IdTransferencia"`
-	IdCuentaDebito  string    `json:"IdCuentaDebito"`
-	IdCuentaCredito string    `json:"IdCuentaCredito"`
+	IdUsuarioFinal  string    `json:"IdUsuarioFinal"`
 	Monto           string    `json:"Monto"`
-	Ledger          uint32    `json:"Ledger"`
+	IdMoneda        uint32    `json:"IdMoneda"`
 	Categoria       uint64    `json:"Categoria"`
-	Tipo            uint16    `json:"Tipo"`
-	EstadoTB        string    `json:"EstadoTB"`
+	Estado          string    `json:"Estado"`
+	Mensaje         string    `json:"Mensaje"`
 	FechaProceso    time.Time `json:"FechaProceso"`
 }
 
-// struct que se envía a traves del Webhook (TODO: eliminar este struct y que solamente se envíe un array de TransferenciaNotificada)
+// struct que se envía a traves del Webhook
 type LoteNotificado struct {
 	CantidadProcesada int                       `json:"CantidadProcesada"`
 	Transferencias    []TransferenciaNotificada `json:"Transferencias"`
 }
 
-// Crear una notif a partir de una Transferencia y su resultado
-func NewTransferenciaNotificada(transfer types.Transfer, result types.TransferEventResult) TransferenciaNotificada {
+// Crear una notif a partir de una Transferencia, su mensaje Kafka original y su resultado de TigerBeetle
+func NewTransferenciaNotificada(transfer types.Transfer, kafkaMsg KafkaTransferencias, result types.TransferEventResult) TransferenciaNotificada {
+	estado := "F"
+	mensaje := result.Result.String()
+	if result.Result != types.TransferOK {
+		estado = "E"
+	}
 	return TransferenciaNotificada{
 		IdTransferencia: utils.Uint128AStringDecimal(transfer.ID),
-		IdCuentaDebito:  utils.Uint128AStringDecimal(transfer.DebitAccountID),
-		IdCuentaCredito: utils.Uint128AStringDecimal(transfer.CreditAccountID),
+		IdUsuarioFinal:  kafkaMsg.IdUsuarioFinal,
 		Monto:           utils.Uint128AStringDecimal(transfer.Amount),
-		Ledger:          transfer.Ledger,
+		IdMoneda:        transfer.Ledger,
 		Categoria:       uint64(transfer.Code),
-		Tipo:            uint16(transfer.Flags),
-		EstadoTB:        result.Result.String(),
+		Estado:          estado,
+		Mensaje:         mensaje,
+		FechaProceso:    time.Now(),
+	}
+}
+
+// Crear una notif para una transferencia rechazada por validación previa (no fue a TigerBeetle)
+func NewTransferenciaNotificadaError(transfer types.Transfer, kafkaMsg KafkaTransferencias, mensajeError string) TransferenciaNotificada {
+	return TransferenciaNotificada{
+		IdTransferencia: utils.Uint128AStringDecimal(transfer.ID),
+		IdUsuarioFinal:  kafkaMsg.IdUsuarioFinal,
+		Monto:           utils.Uint128AStringDecimal(transfer.Amount),
+		IdMoneda:        transfer.Ledger,
+		Categoria:       uint64(transfer.Code),
+		Estado:          "E",
+		Mensaje:         mensajeError,
 		FechaProceso:    time.Now(),
 	}
 }

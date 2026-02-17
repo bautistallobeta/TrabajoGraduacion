@@ -46,11 +46,11 @@ func (tc *TransferenciasControlador) Crear(c echo.Context) error {
 		return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta("JSON inválido o tipo de datos incorrecto: "+err.Error()))
 	}
 
-	if req.Monto == 0 {
+	if req.Monto <= 0 {
 		return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta("Monto debe ser mayor a cero"))
 	}
-	if req.Ledger == 0 {
-		return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta("Ledger debe ser mayor a cero"))
+	if req.IdMoneda <= 0 {
+		return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta("IdMoneda debe ser mayor a cero"))
 	}
 	if req.IdTransferencia == "" || req.IdCuentaDebito == "" || req.IdCuentaCredito == "" {
 		return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta("IdTransferencia, IdCuentaDebito e IdCuentaCredito son obligatorios"))

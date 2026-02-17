@@ -4,6 +4,7 @@ import (
 	"MSTransaccionesFinancieras/internal/gestores"
 	"MSTransaccionesFinancieras/internal/models"
 	"MSTransaccionesFinancieras/internal/utils"
+	"log"
 	"net/http"
 	"strconv"
 
@@ -21,20 +22,21 @@ func NewCuentasControlador(gc *gestores.GestorCuentas) *CuentasControlador {
 
 func (cc *CuentasControlador) Dame(c echo.Context) error {
 	type Request struct {
-		IdCuenta string `param:"IdCuenta"`
+		IdUsuarioFinal uint64 `param:"IdUsuarioFinal"`
+		IdMoneda       uint32 `param:"IdMoneda"`
 	}
 
 	req := &Request{}
 
 	if err := c.Bind(req); err != nil {
-		return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta("Parámetro 'IdCuenta' inválido: "+err.Error()))
+		return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta("Parámetros inválidos: "+err.Error()))
 	}
 
-	if req.IdCuenta == "" {
-		return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta("IdCuenta no puede ser vacío"))
+	if req.IdUsuarioFinal <= 0 || req.IdMoneda <= 0 {
+		return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta("IdUsuarioFinal e IdMoneda son requeridos y deben ser mayores a cero"))
 	}
 
-	cuenta := &models.Cuentas{IdCuenta: req.IdCuenta}
+	cuenta := &models.Cuentas{IdUsuarioFinal: req.IdUsuarioFinal, IdMoneda: req.IdMoneda}
 	err := cuenta.Dame()
 	if err != nil {
 		return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta("Error al obtener cuenta: "+err.Error()))
@@ -44,7 +46,8 @@ func (cc *CuentasControlador) Dame(c echo.Context) error {
 
 func (cc *CuentasControlador) DameHistorial(c echo.Context) error {
 	type Request struct {
-		IdCuenta string `param:"IdCuenta"`
+		IdUsuarioFinal uint64 `param:"IdUsuarioFinal"`
+		IdMoneda       uint32 `param:"IdMoneda"`
 	}
 
 	type BalanceHistorial struct {
@@ -55,22 +58,23 @@ func (cc *CuentasControlador) DameHistorial(c echo.Context) error {
 	}
 
 	type Response struct {
-		IdCuenta  string             `json:"IdCuenta"`
-		Total     int                `json:"Total"`
-		Historial []BalanceHistorial `json:"Historial"`
+		IdUsuarioFinal uint64             `json:"IdUsuarioFinal"`
+		IdMoneda       uint32             `json:"IdMoneda"`
+		Total          int                `json:"Total"`
+		Historial      []BalanceHistorial `json:"Historial"`
 	}
 
 	req := &Request{}
 
 	if err := c.Bind(req); err != nil {
-		return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta("Parámetro 'IdCuenta' inválido: "+err.Error()))
+		return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta("Parámetros inválidos: "+err.Error()))
 	}
 
-	if req.IdCuenta == "" {
-		return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta("IdCuenta no puede ser vacío"))
+	if req.IdUsuarioFinal <= 0 || req.IdMoneda <= 0 {
+		return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta("IdUsuarioFinal e IdMoneda son requeridos y deben ser mayores a cero"))
 	}
 
-	// Parsear query params opcionales (0 = sin filrto)
+	// Parsear query params opcionales (0 = sin filtro)
 	timestampMinStr := c.QueryParam("TimeStampMin")
 	timestampMaxStr := c.QueryParam("TimeStampMax")
 	limiteStr := c.QueryParam("Limite")
@@ -103,7 +107,7 @@ func (cc *CuentasControlador) DameHistorial(c echo.Context) error {
 	}
 
 	//obtener historial
-	cuenta := &models.Cuentas{IdCuenta: req.IdCuenta}
+	cuenta := &models.Cuentas{IdUsuarioFinal: req.IdUsuarioFinal, IdMoneda: req.IdMoneda}
 	balances, err := cuenta.DameHistorialBalances(timestampMin, timestampMax, limite)
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, models.NewErrorRespuesta("Error al obtener historial: "+err.Error()))
@@ -125,9 +129,10 @@ func (cc *CuentasControlador) DameHistorial(c echo.Context) error {
 	}
 
 	respuesta := Response{
-		IdCuenta:  req.IdCuenta,
-		Total:     len(historial),
-		Historial: historial,
+		IdUsuarioFinal: req.IdUsuarioFinal,
+		IdMoneda:       req.IdMoneda,
+		Total:          len(historial),
+		Historial:      historial,
 	}
 
 	return c.JSON(http.StatusOK, respuesta)
@@ -146,7 +151,7 @@ func (cc *CuentasControlador) Crear(c echo.Context) error {
 		return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta("JSON inválido o tipo de datos incorrecto: "+err.Error()))
 	}
 
-	if req.IdUsuarioFinal == 0 || req.IdMoneda == 0 {
+	if req.IdUsuarioFinal <= 0 || req.IdMoneda <= 0 {
 		return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta("Faltan campos requeridos: IdUsuarioFinal, IdMoneda"))
 	}
 	if req.FechaAlta == "" {
@@ -155,20 +160,19 @@ func (cc *CuentasControlador) Crear(c echo.Context) error {
 
 	// cuentas creadas vía API siempre tienen DebitsMustNotExceedCredits = true
 	idCuentaTBString, err := cc.Gestor.Crear(req.IdMoneda, req.IdUsuarioFinal, req.FechaAlta, true)
-
+	log.Printf("\n\nCuentasControlador.Crear: Resultado de creación en GestorCuentas: mensaje='%s', error='%v'", idCuentaTBString, err)
 	if err != nil {
 		return c.JSON(http.StatusConflict, models.NewErrorRespuesta("Error al crear cuenta: "+err.Error()))
 	}
 
 	return c.JSON(http.StatusCreated, map[string]interface{}{
 		"Mensaje": "Cuenta creada exitosamente",
-		"Id":      idCuentaTBString,
 	})
 }
 
 func (cc *CuentasControlador) Buscar(c echo.Context) error {
 	idUsuarioFinalStr := c.QueryParam("IdUsuarioFinal")
-	idLedgerStr := c.QueryParam("IdLedger")
+	idMonedaStr := c.QueryParam("IdMoneda")
 	estado := c.QueryParam("Estado")
 	limitStr := c.QueryParam("Limite")
 
@@ -181,13 +185,13 @@ func (cc *CuentasControlador) Buscar(c echo.Context) error {
 		idUsuarioFinal = parsed
 	}
 
-	var idLedger uint32 = 0
-	if idLedgerStr != "" {
-		parsed, err := strconv.ParseUint(idLedgerStr, 10, 32)
+	var idMoneda uint32 = 0
+	if idMonedaStr != "" {
+		parsed, err := strconv.ParseUint(idMonedaStr, 10, 32)
 		if err != nil {
-			return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta("IdLedger debe ser un número válido"))
+			return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta("IdMoneda debe ser un número válido"))
 		}
-		idLedger = uint32(parsed)
+		idMoneda = uint32(parsed)
 	}
 
 	// solo  se acepta estado "A", "I", o vacío
@@ -205,13 +209,13 @@ func (cc *CuentasControlador) Buscar(c echo.Context) error {
 		if parsed > 500 {
 			return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta("Limite no puede ser mayor a 500"))
 		}
-		if parsed == 0 {
+		if parsed <= 0 {
 			return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta("Limite debe ser mayor a 0"))
 		}
 		limit = uint32(parsed)
 	}
 
-	cuentas, err := cc.Gestor.Buscar(idUsuarioFinal, idLedger, estado, limit)
+	cuentas, err := cc.Gestor.Buscar(idUsuarioFinal, idMoneda, estado, limit)
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, models.NewErrorRespuesta("Error al buscar cuentas: "+err.Error()))
 	}

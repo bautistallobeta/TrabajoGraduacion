@@ -28,12 +28,13 @@ func (pc *ParametrosControlador) Dame(c echo.Context) error {
 	}
 	param := &models.Parametros{Parametro: req.Parametro}
 	mensaje, err := param.Dame(tokenSesion)
+	if mensaje != "OK" {
+		return c.JSON(http.StatusNotFound, models.NewErrorRespuesta(mensaje))
+	}
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, models.NewErrorRespuesta("Error al obtener parámetro: "+err.Error()))
 	}
-	if mensaje != "OK" {
-		return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta(mensaje))
-	}
+
 	return c.JSON(http.StatusOK, param)
 }
 

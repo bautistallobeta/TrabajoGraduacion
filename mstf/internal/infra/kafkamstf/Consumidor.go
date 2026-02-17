@@ -72,7 +72,7 @@ func (c *Consumidor) batchLoop() {
 			return
 		default:
 			// Armar el lote desde Kafka
-			mensajesLote, transferenciasLote := c.armarLoteDesdeKafka(ctx)
+			mensajesLote, transferenciasLote, kafkaMsgsLote := c.armarLoteDesdeKafka(ctx)
 
 			if len(transferenciasLote) == 0 {
 				continue
@@ -81,7 +81,7 @@ func (c *Consumidor) batchLoop() {
 			log.Printf("Lote de Kafka recibido. Procesando %d transferencias.", len(transferenciasLote))
 
 			// Procesar el lote con TigerBeetle y notificar
-			if err := c.procesador.ProcesarLote(transferenciasLote); err != nil {
+			if err := c.procesador.ProcesarLote(transferenciasLote, kafkaMsgsLote); err != nil {
 				log.Printf("CRÍTICO [Consumidor.batchLoop]: Falló procesamiento del lote. NO se hará commit. El lote se reintentará: %v", err)
 				continue
 			}
@@ -96,9 +96,10 @@ func (c *Consumidor) batchLoop() {
 }
 
 // leer msj de kafka y armar lote de transferencias
-func (c *Consumidor) armarLoteDesdeKafka(ctx context.Context) ([]kafka.Message, []types.Transfer) {
+func (c *Consumidor) armarLoteDesdeKafka(ctx context.Context) ([]kafka.Message, []types.Transfer, []models.KafkaTransferencias) {
 	mensajesLote := make([]kafka.Message, 0, c.config.TamanoLoteKafka)
 	transferenciasLote := make([]types.Transfer, 0, c.config.TamanoLoteKafka)
+	kafkaMsgsLote := make([]models.KafkaTransferencias, 0, c.config.TamanoLoteKafka)
 
 	ctxLote, cancelarLote := context.WithTimeout(ctx, c.config.TimeoutLoteKafka)
 	defer cancelarLote()
@@ -115,7 +116,7 @@ func (c *Consumidor) armarLoteDesdeKafka(ctx context.Context) ([]kafka.Message, 
 			log.Printf("ERROR [Consumidor.armarLoteDesdeKafka]: No se pudo fetch mensaje: %v", err)
 			break
 		}
-		transfer, err := c.parseKafkaMessage(msg)
+		transfer, kafkaMsg, err := c.parseKafkaMessage(msg)
 		if err != nil {
 			log.Printf("ERROR [Consumidor.armarLoteDesdeKafka]: Mensaje Kafka inválido (Offset: %d): %v. Saltando mensaje", msg.Offset, err)
 			if errCommit := c.reader.CommitMessages(ctx, msg); errCommit != nil {
@@ -125,35 +126,36 @@ func (c *Consumidor) armarLoteDesdeKafka(ctx context.Context) ([]kafka.Message, 
 		}
 		mensajesLote = append(mensajesLote, msg)
 		transferenciasLote = append(transferenciasLote, transfer)
+		kafkaMsgsLote = append(kafkaMsgsLote, kafkaMsg)
 	}
-	return mensajesLote, transferenciasLote
+	return mensajesLote, transferenciasLote, kafkaMsgsLote
 }
 
 // Mensaje de Kafka a Transfer de TigerBeetle
-func (c *Consumidor) parseKafkaMessage(msg kafka.Message) (types.Transfer, error) {
+func (c *Consumidor) parseKafkaMessage(msg kafka.Message) (types.Transfer, models.KafkaTransferencias, error) {
 	var kafkaMsg models.KafkaTransferencias
 
 	if err := json.Unmarshal(msg.Value, &kafkaMsg); err != nil {
-		return types.Transfer{}, errors.New("fallo al parsear JSON: " + err.Error())
+		return types.Transfer{}, kafkaMsg, errors.New("fallo al parsear JSON: " + err.Error())
 	}
 	if kafkaMsg.IdTransferencia == "" || kafkaMsg.IdCuentaDebito == "" || kafkaMsg.IdCuentaCredito == "" {
-		return types.Transfer{}, errors.New("IDs de transferencia o cuentas están vacíos")
+		return types.Transfer{}, kafkaMsg, errors.New("IDs de transferencia o cuentas están vacíos")
 	}
 	if kafkaMsg.Monto == 0 {
-		return types.Transfer{}, errors.New("monto no puede ser cero")
+		return types.Transfer{}, kafkaMsg, errors.New("monto no puede ser cero")
 	}
 
 	idTransferenciaCast, err := utils.ParsearUint128(kafkaMsg.IdTransferencia)
 	if err != nil {
-		return types.Transfer{}, errors.New("IdTransferencia formato incorrecto")
+		return types.Transfer{}, kafkaMsg, errors.New("IdTransferencia formato incorrecto")
 	}
 	idDebitoCast, err := utils.ParsearUint128(kafkaMsg.IdCuentaDebito)
 	if err != nil {
-		return types.Transfer{}, errors.New("IdCuentaDebito formato incorrecto")
+		return types.Transfer{}, kafkaMsg, errors.New("IdCuentaDebito formato incorrecto")
 	}
 	idCreditoCast, err := utils.ParsearUint128(kafkaMsg.IdCuentaCredito)
 	if err != nil {
-		return types.Transfer{}, errors.New("IdCuentaCredito formato incorrecto")
+		return types.Transfer{}, kafkaMsg, errors.New("IdCuentaCredito formato incorrecto")
 	}
 
 	timeStamp, _ := utils.FechaAUserData128(kafkaMsg.Fecha)
@@ -163,10 +165,10 @@ func (c *Consumidor) parseKafkaMessage(msg kafka.Message) (types.Transfer, error
 		DebitAccountID:  idDebitoCast,
 		CreditAccountID: idCreditoCast,
 		Amount:          types.ToUint128(kafkaMsg.Monto),
-		Ledger:          kafkaMsg.Ledger,
+		Ledger:          kafkaMsg.IdMoneda,
 		Code:            1, // Código hardcodeadeo (TODO: definir qué hacer con el code)
 		UserData64:      kafkaMsg.IdCategoria,
 		UserData128:     timeStamp,
 	}
-	return transferencia, nil
+	return transferencia, kafkaMsg, nil
 }
