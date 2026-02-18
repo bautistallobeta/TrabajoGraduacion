@@ -26,17 +26,20 @@ func NewGestorTransferencias(notificador *webhook.Notificador) *GestorTransferen
 // Procesa un lote de transferencias recibido del consumidor Kafka.
 // Valida reglas de negocio antes de enviar a TigerBeetle.
 // Las transferencias que fallan validación no van a TB pero sí se notifican con su error.
-func (gt *GestorTransferencias) ProcesarLote(batch []types.Transfer, kafkaMsgs []models.KafkaTransferencias) error {
-	if persistence.ClienteTB == nil {
-		return errors.New("Conexión a TigerBeetle no inicializada")
-	}
-
+// fallidasParseo son transferencias que fallaron en el parseo del mensaje Kafka (también se notifican)
+func (gt *GestorTransferencias) ProcesarLote(batch []types.Transfer, kafkaMsgs []models.KafkaTransferencias, fallidasParseo []models.TransferenciaNotificada) error {
 	// Validación previa: separar transferencias válidas de las que fallan reglas de negocio
 	var paraEnviar []types.Transfer
 	var kafkaMsgsValidos []models.KafkaTransferencias
-	var fallidas []models.TransferenciaNotificada
+	fallidas := append([]models.TransferenciaNotificada{}, fallidasParseo...)
 	for i, t := range batch {
-		if estadoError := gt.validarTransferencia(t); estadoError != "" {
+		var estadoError string
+		if t.Code == models.CodigoTransferenciaReversion {
+			estadoError = gt.validarReversion(t, kafkaMsgs[i])
+		} else {
+			estadoError = gt.validarTransferencia(t)
+		}
+		if estadoError != "" {
 			log.Printf("[VALIDACIÓN] Transfer ID %s rechazada: %s", utils.Uint128AStringDecimal(t.ID), estadoError)
 			fallidas = append(fallidas, models.NewTransferenciaNotificadaError(t, kafkaMsgs[i], estadoError))
 		} else {
@@ -46,12 +49,15 @@ func (gt *GestorTransferencias) ProcesarLote(batch []types.Transfer, kafkaMsgs [
 	}
 
 	if len(fallidas) > 0 {
-		log.Printf("VALIDACIÓN: %d de %d transfers rechazadas antes de TigerBeetle.", len(fallidas), len(batch))
+		log.Printf("VALIDACIÓN: %d de %d transfers rechazadas antes de TigerBeetle.", len(fallidas), len(batch)+len(fallidasParseo))
 	}
 
 	// Enviar a TigerBeetle solo las válidas
 	var results []types.TransferEventResult
 	if len(paraEnviar) > 0 {
+		if persistence.ClienteTB == nil {
+			return errors.New("Conexión a TigerBeetle no inicializada")
+		}
 		var err error
 		results, err = persistence.ClienteTB.CreateTransfers(paraEnviar)
 		if err != nil {
@@ -114,6 +120,43 @@ func (gt *GestorTransferencias) validarTransferencia(t types.Transfer) string {
 	}
 	if moneda.Estado != "A" {
 		return "La moneda no existe o no está activa"
+	}
+
+	return ""
+}
+
+// Valida que la transferencia a revertir sea la última de la cuenta
+func (gt *GestorTransferencias) validarReversion(t types.Transfer, kafkaMsg models.KafkaTransferencias) string {
+	idCuentaStr := utils.ConcatenarIDString(uint64(kafkaMsg.IdMoneda), kafkaMsg.IdUsuarioFinal)
+	idCuenta, err := utils.ParsearUint128(idCuentaStr)
+	if err != nil {
+		return "No se pudo construir ID de cuenta usuario para validar reversión"
+	}
+
+	// Obtener la última transfer de la cuenta
+	// Flags: bit 0 = Debits, bit 1 = Credits, bit 2 = Reversed → 0b111 = 7
+	filtro := types.AccountFilter{
+		AccountID: idCuenta,
+		Limit:     1,
+		Flags:     7, // Debits + Credits + Reversed
+	}
+
+	transfers, err := persistence.ClienteTB.GetAccountTransfers(filtro)
+	if err != nil {
+		return "Error al consultar transferencias de la cuenta: " + err.Error()
+	}
+	if len(transfers) == 0 {
+		return "No se encontraron transferencias para esta cuenta"
+	}
+
+	ultimaTransfer := transfers[0]
+
+	if ultimaTransfer.Code == models.CodigoTransferenciaReversion {
+		return "No se puede revertir una reversión"
+	}
+
+	if ultimaTransfer.ID != t.UserData128 {
+		return "Solo se puede revertir la última transferencia de la cuenta"
 	}
 
 	return ""

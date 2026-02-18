@@ -9,16 +9,21 @@ import (
 	"github.com/tigerbeetle/tigerbeetle-go/pkg/types"
 )
 
+const CodigoTransferenciaNormal uint16 = 1
+const CodigoTransferenciaReversion uint16 = 2
+
 // "wrapper" de Transfer de TB
 type Transferencias struct {
-	IdTransferencia string
-	IdUsuarioFinal  uint64
-	IdMoneda        uint32
-	Monto           string
-	Tipo            string
-	Categoria       uint64
-	Fecha           string
-	Estado          string
+	IdTransferencia         string
+	IdUsuarioFinal          uint64
+	IdMoneda                uint32
+	Monto                   string
+	Tipo                    string
+	Categoria               uint64
+	Fecha                   string
+	Estado                  string
+	Code                    uint16
+	IdTransferenciaOriginal string `json:",omitempty"`
 }
 
 func (t *Transferencias) Dame() error {
@@ -46,13 +51,24 @@ func (t *Transferencias) Dame() error {
 
 	transferenciaTB := transfers[0]
 
-	fecha, _ := utils.UserData128AFecha(transferenciaTB.UserData128)
+	// TODO: corregir esto - quedó de cuando guardaba el itmestamp en userdata128 -  "transferencias nuevas usan UserData32 (segundos), viejas usan UserData128 (nanosegundos)"
+	var fecha string
+	if transferenciaTB.UserData32 > 0 {
+		fecha, _ = utils.UserData32AFecha(transferenciaTB.UserData32)
+	} else {
+		fecha, _ = utils.UserData128AFecha(transferenciaTB.UserData128)
+	}
 
 	t.IdMoneda = transferenciaTB.Ledger
 	t.Monto = utils.Uint128AStringDecimal(transferenciaTB.Amount)
 	t.Categoria = transferenciaTB.UserData64
 	t.Fecha = fecha
 	t.Estado = "F"
+	t.Code = transferenciaTB.Code
+
+	if t.Code == CodigoTransferenciaReversion {
+		t.IdTransferenciaOriginal = utils.Uint128AStringDecimal(transferenciaTB.UserData128)
+	}
 
 	// Derivar Tipo e IdUsuarioFinal comparando DebitAccountID/CreditAccountID con la cuenta empresa
 	// TODO: eliminar hardcodeo de token
@@ -60,14 +76,23 @@ func (t *Transferencias) Dame() error {
 	if _, err := moneda.Dame("cf904666e02a79cfd50b074ab3c360c0"); err == nil && moneda.IdCuentaEmpresa != "" {
 		idCuentaEmpresa, errParse := utils.ParsearUint128(moneda.IdCuentaEmpresa)
 		if errParse == nil {
-			// Identificar cuál cuenta es del usuario (la que no es empresa)
 			var idCuentaUsuario types.Uint128
-			if transferenciaTB.DebitAccountID == idCuentaEmpresa {
-				t.Tipo = "I" // La empresa debita → el usuario recibe → Ingreso
-				idCuentaUsuario = transferenciaTB.CreditAccountID
-			} else if transferenciaTB.CreditAccountID == idCuentaEmpresa {
-				t.Tipo = "E" // La empresa recibe crédito → el usuario paga → Egreso
-				idCuentaUsuario = transferenciaTB.DebitAccountID
+			if t.Code == CodigoTransferenciaReversion {
+				t.Tipo = "R"
+				// En reversión las cuentas están invertidas
+				if transferenciaTB.DebitAccountID == idCuentaEmpresa {
+					idCuentaUsuario = transferenciaTB.CreditAccountID
+				} else {
+					idCuentaUsuario = transferenciaTB.DebitAccountID
+				}
+			} else {
+				if transferenciaTB.DebitAccountID == idCuentaEmpresa {
+					t.Tipo = "I"
+					idCuentaUsuario = transferenciaTB.CreditAccountID
+				} else if transferenciaTB.CreditAccountID == idCuentaEmpresa {
+					t.Tipo = "E"
+					idCuentaUsuario = transferenciaTB.DebitAccountID
+				}
 			}
 
 			// Obtener IdUsuarioFinal del UserData64 de la cuenta usuario en TB
@@ -79,9 +104,4 @@ func (t *Transferencias) Dame() error {
 	}
 
 	return nil
-}
-
-// TODO
-func (t *Transferencias) Revertir() (string, error) {
-	return "Reversión no implementada", errors.New("No implementado")
 }

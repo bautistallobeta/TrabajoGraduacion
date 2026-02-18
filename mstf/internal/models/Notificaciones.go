@@ -2,6 +2,7 @@ package models
 
 import (
 	"MSTransaccionesFinancieras/internal/utils"
+	"strconv"
 	"time"
 
 	"github.com/tigerbeetle/tigerbeetle-go/pkg/types"
@@ -39,7 +40,7 @@ func NewTransferenciaNotificada(transfer types.Transfer, kafkaMsg KafkaTransfere
 		Monto:           utils.Uint128AStringDecimal(transfer.Amount),
 		IdMoneda:        transfer.Ledger,
 		Tipo:            kafkaMsg.Tipo,
-		Categoria:       kafkaMsg.IdCategoria,
+		Categoria:       transfer.UserData64,
 		Estado:          estado,
 		Mensaje:         mensaje,
 		FechaProceso:    time.Now(),
@@ -53,6 +54,25 @@ func NewTransferenciaNotificadaError(transfer types.Transfer, kafkaMsg KafkaTran
 		IdUsuarioFinal:  kafkaMsg.IdUsuarioFinal,
 		Monto:           utils.Uint128AStringDecimal(transfer.Amount),
 		IdMoneda:        transfer.Ledger,
+		Tipo:            kafkaMsg.Tipo,
+		Categoria:       kafkaMsg.IdCategoria,
+		Estado:          "E",
+		Mensaje:         mensajeError,
+		FechaProceso:    time.Now(),
+	}
+}
+
+// Crear una notif para un mensaje de Kafka que falló en el parseo (no se pudo construir la Transfer de TB).
+func NewTransferenciaNotificadaParseoError(kafkaMsg KafkaTransferencias, mensajeError string) TransferenciaNotificada {
+	idTransferencia := kafkaMsg.IdTransferencia
+	if idTransferencia == "" {
+		idTransferencia = "0"
+	}
+	return TransferenciaNotificada{
+		IdTransferencia: idTransferencia,
+		IdUsuarioFinal:  kafkaMsg.IdUsuarioFinal,
+		Monto:           strconv.FormatUint(kafkaMsg.Monto, 10),
+		IdMoneda:        kafkaMsg.IdMoneda,
 		Tipo:            kafkaMsg.Tipo,
 		Categoria:       kafkaMsg.IdCategoria,
 		Estado:          "E",

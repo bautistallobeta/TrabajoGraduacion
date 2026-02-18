@@ -46,20 +46,20 @@ func (tc *TransferenciasControlador) Crear(c echo.Context) error {
 		return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta("JSON inválido o tipo de datos incorrecto: "+err.Error()))
 	}
 
-	if req.Monto <= 0 {
-		return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta("Monto debe ser mayor a cero"))
-	}
-	if req.IdMoneda <= 0 {
-		return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta("IdMoneda debe ser mayor a cero"))
-	}
 	if req.IdTransferencia == "" {
 		return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta("IdTransferencia es obligatorio"))
 	}
 	if req.IdUsuarioFinal == 0 {
 		return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta("IdUsuarioFinal es obligatorio"))
 	}
-	if req.Tipo != "I" && req.Tipo != "E" {
-		return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta("Tipo debe ser 'I' (ingreso) o 'E' (egreso)"))
+	if req.IdMoneda <= 0 {
+		return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta("IdMoneda debe ser mayor a cero"))
+	}
+	if req.Tipo != "I" && req.Tipo != "E" && req.Tipo != "R" {
+		return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta("Tipo debe ser 'I' (ingreso), 'E' (egreso) o 'R' (reversión)"))
+	}
+	if req.Tipo != "R" && req.Monto <= 0 {
+		return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta("Monto debe ser mayor a cero"))
 	}
 
 	//Publish de la transferencia en Kafka
