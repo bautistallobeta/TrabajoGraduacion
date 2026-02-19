@@ -20,9 +20,7 @@ import (
 	"github.com/tigerbeetle/tigerbeetle-go/pkg/types"
 )
 
-// Inicializa las cuentas empresa en TigerBeetle para cada moneda activa.
-// Lee las monedas activas de MySQL, verifica cuáles ya existen en TB (un solo lookup),
-// y crea las faltantes en un solo llamado a TB.
+// Inicializa las cuentas empresa en TigerBeetle para cada moneda activa
 func inicializarCuentasEmpresa() error {
 	log.Println("Inicializando cuentas empresa...")
 
@@ -39,11 +37,11 @@ func inicializarCuentasEmpresa() error {
 		return nil
 	}
 
-	// Armar array de IDs de cuentas empresa para consultar a TB en un solo llamado
 	type monedaPendiente struct {
 		idMoneda  int
 		fechaAlta string
 	}
+	// array de IDs de cuentas empresa (unica consulta a TB)
 	var ids []types.Uint128
 	pendientes := make(map[types.Uint128]monedaPendiente)
 
@@ -69,7 +67,7 @@ func inicializarCuentasEmpresa() error {
 		return nil
 	}
 
-	// Consultar TB en un solo llamado
+	// llamado a TB
 	cuentasExistentes, err := persistence.ClienteTB.LookupAccounts(ids)
 	log.Printf("Cuentas empresa encontradas en TB: %d de %d", len(cuentasExistentes), len(ids))
 	log.Printf("IDs de cuentas empresa pendientes de creación: %v", ids)
@@ -79,13 +77,12 @@ func inicializarCuentasEmpresa() error {
 		return err
 	}
 
-	// Marcar las que ya existen
+	// Marcar existentes
 	existe := make(map[types.Uint128]bool)
 	for _, c := range cuentasExistentes {
 		existe[c.ID] = true
 	}
 
-	// Armar lote de cuentas faltantes
 	var faltantes []gestores.CuentaNueva
 	for _, tbId := range ids {
 		if existe[tbId] {
@@ -105,7 +102,7 @@ func inicializarCuentasEmpresa() error {
 		return nil
 	}
 
-	// Crear las faltantes en un solo llamado
+	// Creación de cuentras empresas faltantes
 	log.Printf("Creando %d cuentas empresa faltantes...", len(faltantes))
 	gc := gestores.NewGestorCuentas()
 	idsCreados, err := gc.CrearLote(faltantes)
@@ -177,7 +174,6 @@ func main() {
 	persistence.CloseTBClient()
 	persistence.CloseMySQLClient()
 
-	// apagar server (con timeout)
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	if err := e.Shutdown(ctx); err != nil {

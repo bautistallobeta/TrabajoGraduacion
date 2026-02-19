@@ -28,24 +28,21 @@ func NewGestorTransferencias(notificador *webhook.Notificador) *GestorTransferen
 // Las transferencias que fallan validación no van a TB pero sí se notifican con su error.
 // fallidasParseo son transferencias que fallaron en el parseo del mensaje Kafka (también se notifican)
 func (gt *GestorTransferencias) ProcesarLote(batch []types.Transfer, kafkaMsgs []models.KafkaTransferencias, fallidasParseo []models.TransferenciaNotificada) error {
-	// Validación previa: separar transferencias válidas de las que fallan reglas de negocio
 	var paraEnviar []types.Transfer
 	var kafkaMsgsValidos []models.KafkaTransferencias
 	fallidas := append([]models.TransferenciaNotificada{}, fallidasParseo...)
 
-	// Pre-validar existencia y saldo de cuentas antes de ir a TigerBeetle.
-	// Una única llamada LookupAccounts cubre todo el batch.
+	// validar existencia y saldo de cuentas antes de ir a TigerBeetle
 	erroresCuentas := gt.preValidarCuentas(batch)
 
 	for i, t := range batch {
-		// Primero: pre-validación de cuentas (existencia, estado, saldo)
 		if erroresCuentas[i] != "" {
 			log.Printf("[VALIDACIÓN] Transfer ID %s rechazada: %s", utils.Uint128AStringDecimal(t.ID), erroresCuentas[i])
 			fallidas = append(fallidas, models.NewTransferenciaNotificadaError(t, kafkaMsgs[i], erroresCuentas[i]))
 			continue
 		}
 
-		// Luego: validaciones de negocio (montos, moneda, reversión)
+		// validaciones de reglaas negocio (montos, moneda, reversión)
 		var estadoError string
 		if t.Code == models.CodigoTransferenciaReversion {
 			estadoError = gt.validarReversion(t, kafkaMsgs[i])
@@ -65,7 +62,6 @@ func (gt *GestorTransferencias) ProcesarLote(batch []types.Transfer, kafkaMsgs [
 		log.Printf("VALIDACIÓN: %d de %d transfers rechazadas antes de TigerBeetle.", len(fallidas), len(batch)+len(fallidasParseo))
 	}
 
-	// Enviar a TigerBeetle solo las válidas
 	var results []types.TransferEventResult
 	if len(paraEnviar) > 0 {
 		if persistence.ClienteTB == nil {
@@ -93,7 +89,7 @@ func (gt *GestorTransferencias) ProcesarLote(batch []types.Transfer, kafkaMsgs [
 		}
 	}
 
-	// Notificar todo: resultados de TB + rechazadas por validación previa
+	// Notificar todo: resultados de TB + rechazadas
 	if err := gt.notificador.NotificarTransferencias(paraEnviar, kafkaMsgsValidos, results, fallidas); err != nil {
 		log.Printf("ERROR [GestorTransferencias.ProcesarLote]: Falló la notificación del Webhook: %v", err)
 		return err
@@ -106,8 +102,6 @@ func (gt *GestorTransferencias) ProcesarLote(batch []types.Transfer, kafkaMsgs [
 // Retorna "" si la transferencia es válida, o un string con el código de error.
 func (gt *GestorTransferencias) validarTransferencia(t types.Transfer) string {
 	monto := binary.LittleEndian.Uint64(t.Amount[:8])
-
-	// Verificación de monto máximo por transferencia (parámetro MONTOMAXTRANSFER)
 	// TODO: eliminar hardcodeo de token
 	paramMax := &models.Parametros{Parametro: "MONTOMAXTRANSFER"}
 	if _, err := paramMax.Dame("cf904666e02a79cfd50b074ab3c360c0"); err == nil {
@@ -115,8 +109,6 @@ func (gt *GestorTransferencias) validarTransferencia(t types.Transfer) string {
 			return "El monto excede el máximo permitido por transferencia"
 		}
 	}
-
-	// Verificación de monto mínimo por transferencia (parámetro MONTOMINTRANSFER)
 	// TODO: eliminar hardcodeo de token
 	paramMin := &models.Parametros{Parametro: "MONTOMINTRANSFER"}
 	if _, err := paramMin.Dame("cf904666e02a79cfd50b074ab3c360c0"); err == nil {
@@ -125,7 +117,6 @@ func (gt *GestorTransferencias) validarTransferencia(t types.Transfer) string {
 		}
 	}
 
-	// Verificación de moneda existente y activa
 	// TODO: eliminar hardcodeo de token
 	moneda := &models.Monedas{IdMoneda: int(t.Ledger)}
 	if _, err := moneda.Dame("cf904666e02a79cfd50b074ab3c360c0"); err != nil {
@@ -153,7 +144,7 @@ func (gt *GestorTransferencias) preValidarCuentas(batch []types.Transfer) []stri
 		return errores
 	}
 
-	// Recolectar IDs únicos de cuentas débito y crédito del batch
+	//IDs únicos de cuentas débito y crédito del batch
 	idsSet := make(map[types.Uint128]struct{})
 	for _, t := range batch {
 		idsSet[t.DebitAccountID] = struct{}{}
@@ -164,7 +155,6 @@ func (gt *GestorTransferencias) preValidarCuentas(batch []types.Transfer) []stri
 		ids = append(ids, id)
 	}
 
-	// Una sola llamada batch a TigerBeetle para todas las cuentas del lote
 	accounts, err := persistence.ClienteTB.LookupAccounts(ids)
 	if err != nil {
 		for i := range errores {
@@ -173,13 +163,12 @@ func (gt *GestorTransferencias) preValidarCuentas(batch []types.Transfer) []stri
 		return errores
 	}
 
-	// Mapa accountID → Account para lookup O(1)
+	// mapeo accountID → Account para lookup
 	mapaAccounts := make(map[types.Uint128]types.Account, len(accounts))
 	for _, a := range accounts {
 		mapaAccounts[a.ID] = a
 	}
 
-	// Flags de referencia (mismo patrón que Cuentas.go)
 	flagCerrada := types.AccountFlags{Closed: true}.ToUint16()
 	flagDebitsMustNotExceedCredits := types.AccountFlags{DebitsMustNotExceedCredits: true}.ToUint16()
 
@@ -201,9 +190,8 @@ func (gt *GestorTransferencias) preValidarCuentas(batch []types.Transfer) []stri
 			continue
 		}
 
-		// Verificar saldo solo si el flag lo exige (cubre Egresos, Ingresos y Reversiones)
 		if (debitAccount.Flags & flagDebitsMustNotExceedCredits) != 0 {
-			// Leer lower 64 bits en LE (patrón establecido en validarTransferencia)
+			// Leer lower 64 bits en LE
 			creditsPosted := binary.LittleEndian.Uint64(debitAccount.CreditsPosted[:8])
 			debitsPosted := binary.LittleEndian.Uint64(debitAccount.DebitsPosted[:8])
 			monto := binary.LittleEndian.Uint64(t.Amount[:8])

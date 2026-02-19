@@ -113,7 +113,6 @@ func (cc *CuentasControlador) DameHistorial(c echo.Context) error {
 		return c.JSON(http.StatusInternalServerError, models.NewErrorRespuesta("Error al obtener historial: "+err.Error()))
 	}
 
-	// convertir AccountBalance a BalanceHistorial
 	historial := make([]BalanceHistorial, 0, len(balances))
 	for _, balance := range balances {
 		creditos := balance.CreditsPosted.BigInt()
