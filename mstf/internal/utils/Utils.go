@@ -30,6 +30,9 @@ func ParsearUint128(s string) (types.Uint128, error) {
 	if !ok || bi.Sign() < 0 {
 		return types.Uint128{}, errors.New("Formato de ID inválido. Solo se acepta la representación decimal")
 	}
+	if len(bi.Bytes()) > 16 {
+		return types.Uint128{}, errors.New("Formato de ID inválido: el valor excede el máximo de 128 bits")
+	}
 	return types.BigIntToUint128(*bi), nil
 }
 

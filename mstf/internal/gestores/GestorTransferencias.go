@@ -32,7 +32,20 @@ func (gt *GestorTransferencias) ProcesarLote(batch []types.Transfer, kafkaMsgs [
 	var paraEnviar []types.Transfer
 	var kafkaMsgsValidos []models.KafkaTransferencias
 	fallidas := append([]models.TransferenciaNotificada{}, fallidasParseo...)
+
+	// Pre-validar existencia y saldo de cuentas antes de ir a TigerBeetle.
+	// Una única llamada LookupAccounts cubre todo el batch.
+	erroresCuentas := gt.preValidarCuentas(batch)
+
 	for i, t := range batch {
+		// Primero: pre-validación de cuentas (existencia, estado, saldo)
+		if erroresCuentas[i] != "" {
+			log.Printf("[VALIDACIÓN] Transfer ID %s rechazada: %s", utils.Uint128AStringDecimal(t.ID), erroresCuentas[i])
+			fallidas = append(fallidas, models.NewTransferenciaNotificadaError(t, kafkaMsgs[i], erroresCuentas[i]))
+			continue
+		}
+
+		// Luego: validaciones de negocio (montos, moneda, reversión)
 		var estadoError string
 		if t.Code == models.CodigoTransferenciaReversion {
 			estadoError = gt.validarReversion(t, kafkaMsgs[i])
@@ -123,6 +136,90 @@ func (gt *GestorTransferencias) validarTransferencia(t types.Transfer) string {
 	}
 
 	return ""
+}
+
+// preValidarCuentas verifica, en una única llamada batch a TigerBeetle, que:
+//   - la cuenta débito y la cuenta crédito existen,
+//   - la cuenta débito no está cerrada (flag Closed),
+//   - si la cuenta débito tiene el flag DebitsMustNotExceedCredits, el saldo
+//     disponible (descontando los débitos virtuales ya aprobados en este batch)
+//     es suficiente para cubrir el monto.
+//
+// Retorna un slice del mismo largo que batch: "" = válida, otro valor = mensaje de error.
+func (gt *GestorTransferencias) preValidarCuentas(batch []types.Transfer) []string {
+	errores := make([]string, len(batch))
+
+	if len(batch) == 0 {
+		return errores
+	}
+
+	// Recolectar IDs únicos de cuentas débito y crédito del batch
+	idsSet := make(map[types.Uint128]struct{})
+	for _, t := range batch {
+		idsSet[t.DebitAccountID] = struct{}{}
+		idsSet[t.CreditAccountID] = struct{}{}
+	}
+	ids := make([]types.Uint128, 0, len(idsSet))
+	for id := range idsSet {
+		ids = append(ids, id)
+	}
+
+	// Una sola llamada batch a TigerBeetle para todas las cuentas del lote
+	accounts, err := persistence.ClienteTB.LookupAccounts(ids)
+	if err != nil {
+		for i := range errores {
+			errores[i] = "Error al consultar cuentas: " + err.Error()
+		}
+		return errores
+	}
+
+	// Mapa accountID → Account para lookup O(1)
+	mapaAccounts := make(map[types.Uint128]types.Account, len(accounts))
+	for _, a := range accounts {
+		mapaAccounts[a.ID] = a
+	}
+
+	// Flags de referencia (mismo patrón que Cuentas.go)
+	flagCerrada := types.AccountFlags{Closed: true}.ToUint16()
+	flagDebitsMustNotExceedCredits := types.AccountFlags{DebitsMustNotExceedCredits: true}.ToUint16()
+
+	// Acumulador de débitos virtuales aprobados en este batch por cuenta
+	debitosVirtuales := make(map[types.Uint128]uint64)
+
+	for i, t := range batch {
+		debitAccount, existeDebit := mapaAccounts[t.DebitAccountID]
+		if !existeDebit {
+			errores[i] = "Cuenta no encontrada"
+			continue
+		}
+		if _, existeCredit := mapaAccounts[t.CreditAccountID]; !existeCredit {
+			errores[i] = "Cuenta no encontrada"
+			continue
+		}
+		if (debitAccount.Flags & flagCerrada) != 0 {
+			errores[i] = "La cuenta está cerrada"
+			continue
+		}
+
+		// Verificar saldo solo si el flag lo exige (cubre Egresos, Ingresos y Reversiones)
+		if (debitAccount.Flags & flagDebitsMustNotExceedCredits) != 0 {
+			// Leer lower 64 bits en LE (patrón establecido en validarTransferencia)
+			creditsPosted := binary.LittleEndian.Uint64(debitAccount.CreditsPosted[:8])
+			debitsPosted := binary.LittleEndian.Uint64(debitAccount.DebitsPosted[:8])
+			monto := binary.LittleEndian.Uint64(t.Amount[:8])
+			acumulado := debitosVirtuales[t.DebitAccountID]
+
+			// balance disponible real menos lo comprometido en este batch
+			balance := creditsPosted - debitsPosted
+			if balance < acumulado+monto {
+				errores[i] = "Saldo insuficiente en cuenta"
+				continue
+			}
+			debitosVirtuales[t.DebitAccountID] += monto
+		}
+	}
+
+	return errores
 }
 
 // Valida que la transferencia a revertir sea la última de la cuenta

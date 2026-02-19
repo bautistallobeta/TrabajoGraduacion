@@ -63,11 +63,13 @@ func (t *Transferencias) Dame() error {
 	t.Monto = utils.Uint128AStringDecimal(transferenciaTB.Amount)
 	t.Categoria = transferenciaTB.UserData64
 	t.Fecha = fecha
-	t.Estado = "F"
 	t.Code = transferenciaTB.Code
 
 	if t.Code == CodigoTransferenciaReversion {
+		t.Estado = "R"
 		t.IdTransferenciaOriginal = utils.Uint128AStringDecimal(transferenciaTB.UserData128)
+	} else {
+		t.Estado = "F"
 	}
 
 	// Derivar Tipo e IdUsuarioFinal comparando DebitAccountID/CreditAccountID con la cuenta empresa

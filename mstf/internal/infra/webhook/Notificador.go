@@ -67,7 +67,7 @@ func (n *Notificador) llamarWebhook(payload models.LoteNotificado) error {
 	client := http.Client{
 		Timeout: 15 * time.Second,
 	}
-	resp, err := client.Post(urlWebhook, "application/json", bytes.NewBuffer(jsonPayload))
+	resp, err := client.Post(urlWebhook, "application/json; charset=utf-8", bytes.NewBuffer(jsonPayload))
 	if err != nil {
 		log.Printf("ERROR [Notificador.llamarWebhook]: Fallo al llamar Webhook a %s: %v", urlWebhook, err)
 		return err
