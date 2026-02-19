@@ -62,8 +62,7 @@ func (mc *MonedasControlador) Listar(c echo.Context) error {
 
 func (mc *MonedasControlador) Crear(c echo.Context) error {
 	type Request struct {
-		IdMoneda        int    `json:"IdMoneda"`
-		IdCuentaEmpresa string `json:"IdCuentaEmpresa"`
+		IdMoneda int `json:"IdMoneda"`
 	}
 	req := &Request{}
 	if err := c.Bind(req); err != nil {
