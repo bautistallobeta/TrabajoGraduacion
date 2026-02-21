@@ -7,6 +7,7 @@ import (
 	"io"
 	"log"
 	"sync"
+	"time"
 
 	"MSTransaccionesFinancieras/internal/config"
 	"MSTransaccionesFinancieras/internal/gestores"
@@ -81,16 +82,53 @@ func (c *Consumidor) batchLoop() {
 
 			log.Printf("Lote de Kafka recibido. Procesando %d transferencias (%d fallidas en parseo).", len(transferenciasLote), len(fallidasParseo))
 
-			// Procesar el lote con TigerBeetle y notificar
-			if err := c.procesador.ProcesarLote(transferenciasLote, kafkaMsgsLote, fallidasParseo); err != nil {
-				log.Printf("CRÍTICO [Consumidor.batchLoop]: Falló procesamiento del lote. NO se hará commit. El lote se reintentará: %v", err)
-				continue
+			// Procesar con retry en memoria: no avanza al próximo lote hasta que éste tenga éxito.
+			// Si el MS cae durante el retry, Kafka re-entrega el lote desde el offset no committeado.
+			if err := c.procesarConRetry(ctx, mensajesLote, transferenciasLote, kafkaMsgsLote, fallidasParseo); err != nil {
+				return // consumidor detenido durante reintento
 			}
+		}
+	}
+}
 
-			// Commit de offsets en Kafka (solo llega hasta acá si no falló la escritura en TB)
+// llama a ProcesarLote con backoff exponencial hasta que tenga éxito.
+// El backoff empieza en 1s y se duplica en cada intento hasta el límite RETRY_MAX_BACKOFF_SECONDS.
+// Nunca abandona, bloquea hasta que el servicio caído (TB, webhook, etc.) se recupere.
+// Retorna error solo si el consumidor es detenido vía stopChan durante el espera.
+func (c *Consumidor) procesarConRetry(
+	ctx context.Context,
+	mensajesLote []kafka.Message,
+	transferenciasLote []types.Transfer,
+	kafkaMsgsLote []models.KafkaTransferencias,
+	fallidasParseo []models.TransferenciaNotificada,
+) error {
+	backoff := time.Second
+	maxBackoff := time.Duration(c.config.RetryMaxBackoffSeconds) * time.Second
+
+	for {
+		err := c.procesador.ProcesarLote(transferenciasLote, kafkaMsgsLote, fallidasParseo)
+		if err == nil {
+			// Commit de offsets en Kafka (solo llega hasta acá si el procesamiento fue exitoso)
 			log.Printf("Lote procesado exitosamente. Haciendo commit de %d offsets en Kafka.", len(mensajesLote))
-			if err := c.reader.CommitMessages(ctx, mensajesLote...); err != nil {
-				log.Printf("CRÍTICO [Consumidor.batchLoop]: No se pudo hacer commit de offsets: %v", err)
+			if commitErr := c.reader.CommitMessages(ctx, mensajesLote...); commitErr != nil {
+				log.Printf("CRÍTICO [Consumidor.batchLoop]: No se pudo hacer commit de offsets: %v", commitErr)
+			}
+			return nil
+		}
+
+		log.Printf("CRÍTICO [Consumidor.batchLoop]: Falló procesamiento del lote. NO se hará commit. Reintentando en %v: %v", backoff, err)
+
+		select {
+		case <-c.stopChan:
+			log.Println("Consumidor detenido durante reintento. Kafka re-entregará el lote al reiniciar.")
+			return errors.New("consumidor detenido")
+		case <-time.After(backoff):
+		}
+
+		if backoff < maxBackoff {
+			backoff *= 2
+			if backoff > maxBackoff {
+				backoff = maxBackoff
 			}
 		}
 	}

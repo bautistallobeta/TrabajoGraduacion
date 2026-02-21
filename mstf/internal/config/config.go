@@ -19,8 +19,9 @@ type Config struct {
 	TopicKafka   string
 	GroupIDKafka string
 	// Batching
-	TamanoLoteKafka  int
-	TimeoutLoteKafka time.Duration
+	TamanoLoteKafka       int
+	TimeoutLoteKafka      time.Duration
+	RetryMaxBackoffSeconds int
 	// MySQL
 	MySQLHost     string
 	MySQLPort     int
@@ -55,6 +56,7 @@ func Load() Config {
 	cfg.GroupIDKafka = mustGetEnv("KAFKA_GROUP_ID", "")
 	cfg.TamanoLoteKafka = mustGetEnvInt("KAFKA_BATCH_SIZE", 1000)
 	cfg.TimeoutLoteKafka = time.Duration(mustGetEnvInt("KAFKA_BATCH_TIMEOUT_MS", 20000)) * time.Millisecond
+	cfg.RetryMaxBackoffSeconds = mustGetEnvInt("RETRY_MAX_BACKOFF_SECONDS", 20)
 
 	// MySQL
 	cfg.MySQLHost = mustGetEnv("MYSQL_HOST", "")

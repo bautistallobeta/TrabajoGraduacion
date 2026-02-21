@@ -17,9 +17,11 @@ type ProductorKafka struct {
 
 func InitProductor(cfg config.Config) (*ProductorKafka, error) {
 	writer := &kafka.Writer{
-		Addr:     kafka.TCP(cfg.BrokersKafka...),
-		Topic:    cfg.TopicKafka,
-		Balancer: &kafka.LeastBytes{},
+		Addr:         kafka.TCP(cfg.BrokersKafka...),
+		Topic:        cfg.TopicKafka,
+		Balancer:     &kafka.LeastBytes{},
+		RequiredAcks: kafka.RequireAll,
+		MaxAttempts:  3,
 	}
 
 	log.Println("Productor de Kafka conectado.")
