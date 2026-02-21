@@ -47,10 +47,16 @@ func (gt *GestorTransferencias) ProcesarLote(batch []types.Transfer, kafkaMsgs [
 			continue
 		}
 
-		// validaciones de reglaas negocio (montos, moneda, reversión)
+		// validaciones de reglas de negocio (montos, moneda, reversión)
 		var estadoError string
 		if t.Code == models.CodigoTransferenciaReversion {
-			estadoError = gt.validarReversion(t, kafkaMsgs[i])
+			var errInfra error
+			estadoError, errInfra = gt.validarReversion(t, kafkaMsgs[i])
+			if errInfra != nil {
+				// error de infraestructura (TB caído) → no notificar, dejar que procesarConRetry reintente
+				log.Printf("ERROR [GestorTransferencias.ProcesarLote]: Error de infraestructura en validarReversion: %v", errInfra)
+				return errInfra
+			}
 		} else {
 			estadoError = gt.validarTransferencia(t)
 		}
@@ -214,12 +220,13 @@ func (gt *GestorTransferencias) preValidarCuentas(batch []types.Transfer) ([]str
 	return errores, nil
 }
 
-// Valida que la transferencia a revertir sea la última de la cuenta
-func (gt *GestorTransferencias) validarReversion(t types.Transfer, kafkaMsg models.KafkaTransferencias) string {
+// Valida que la transferencia a revertir sea la última de la cuenta.
+// Retorna ("mensaje", nil) para errores de negocio, ("", error) para errores de infraestructura.
+func (gt *GestorTransferencias) validarReversion(t types.Transfer, kafkaMsg models.KafkaTransferencias) (string, error) {
 	idCuentaStr := utils.ConcatenarIDString(uint64(kafkaMsg.IdMoneda), kafkaMsg.IdUsuarioFinal)
 	idCuenta, err := utils.ParsearUint128(idCuentaStr)
 	if err != nil {
-		return "No se pudo construir ID de cuenta usuario para validar reversión"
+		return "No se pudo construir ID de cuenta usuario para validar reversión", nil
 	}
 
 	// Obtener la última transfer de la cuenta
@@ -232,21 +239,22 @@ func (gt *GestorTransferencias) validarReversion(t types.Transfer, kafkaMsg mode
 
 	transfers, err := persistence.ClienteTB.GetAccountTransfers(filtro)
 	if err != nil {
-		return "Error al consultar transferencias de la cuenta: " + err.Error()
+		// error de infraestructura: el caller debe reintentar, no notificar como error de negocio
+		return "", err
 	}
 	if len(transfers) == 0 {
-		return "No se encontraron transferencias para esta cuenta"
+		return "No se encontraron transferencias para esta cuenta", nil
 	}
 
 	ultimaTransfer := transfers[0]
 
 	if ultimaTransfer.Code == models.CodigoTransferenciaReversion {
-		return "No se puede revertir una reversión"
+		return "No se puede revertir una reversión", nil
 	}
 
 	if ultimaTransfer.ID != t.UserData128 {
-		return "Solo se puede revertir la última transferencia de la cuenta"
+		return "Solo se puede revertir la última transferencia de la cuenta", nil
 	}
 
-	return ""
+	return "", nil
 }
