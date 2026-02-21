@@ -33,7 +33,12 @@ func (gt *GestorTransferencias) ProcesarLote(batch []types.Transfer, kafkaMsgs [
 	fallidas := append([]models.TransferenciaNotificada{}, fallidasParseo...)
 
 	// validar existencia y saldo de cuentas antes de ir a TigerBeetle
-	erroresCuentas := gt.preValidarCuentas(batch)
+	erroresCuentas, err := gt.preValidarCuentas(batch)
+	if err != nil {
+		// error de infraestructura (TB caído) → no notificar, dejar que procesarConRetry reintente
+		log.Printf("ERROR [GestorTransferencias.ProcesarLote]: Error de infraestructura en preValidarCuentas: %v", err)
+		return err
+	}
 
 	for i, t := range batch {
 		if erroresCuentas[i] != "" {
@@ -136,12 +141,13 @@ func (gt *GestorTransferencias) validarTransferencia(t types.Transfer) string {
 //     disponible (descontando los débitos virtuales ya aprobados en este batch)
 //     es suficiente para cubrir el monto.
 //
-// Retorna un slice del mismo largo que batch: "" = válida, otro valor = mensaje de error.
-func (gt *GestorTransferencias) preValidarCuentas(batch []types.Transfer) []string {
+// Retorna (slice, nil): slice del mismo largo que batch ("" = válida, otro valor = error de negocio).
+// Retorna (nil, error): error de infraestructura (TB caído) que debe reintentarse, no notificarse.
+func (gt *GestorTransferencias) preValidarCuentas(batch []types.Transfer) ([]string, error) {
 	errores := make([]string, len(batch))
 
 	if len(batch) == 0 {
-		return errores
+		return errores, nil
 	}
 
 	//IDs únicos de cuentas débito y crédito del batch
@@ -157,10 +163,8 @@ func (gt *GestorTransferencias) preValidarCuentas(batch []types.Transfer) []stri
 
 	accounts, err := persistence.ClienteTB.LookupAccounts(ids)
 	if err != nil {
-		for i := range errores {
-			errores[i] = "Error al consultar cuentas: " + err.Error()
-		}
-		return errores
+		// error de infraestructura: el caller debe reintentar, no notificar como error de negocio
+		return nil, err
 	}
 
 	// mapeo accountID → Account para lookup
@@ -207,7 +211,7 @@ func (gt *GestorTransferencias) preValidarCuentas(batch []types.Transfer) []stri
 		}
 	}
 
-	return errores
+	return errores, nil
 }
 
 // Valida que la transferencia a revertir sea la última de la cuenta
