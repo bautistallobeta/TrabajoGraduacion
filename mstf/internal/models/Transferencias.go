@@ -21,8 +21,8 @@ type Transferencias struct {
 	Tipo                    string
 	Categoria               uint64
 	Fecha                   string
+	FechaProceso            string
 	Estado                  string
-	Code                    uint16
 	IdTransferenciaOriginal string `json:",omitempty"`
 }
 
@@ -63,9 +63,10 @@ func (t *Transferencias) Dame() error {
 	t.Monto = utils.Uint128AStringDecimal(transferenciaTB.Amount)
 	t.Categoria = transferenciaTB.UserData64
 	t.Fecha = fecha
-	t.Code = transferenciaTB.Code
+	t.FechaProceso = utils.TimestampAFecha(transferenciaTB.Timestamp)
+	code := transferenciaTB.Code
 
-	if t.Code == CodigoTransferenciaReversion {
+	if code == CodigoTransferenciaReversion {
 		t.Estado = "R"
 		t.IdTransferenciaOriginal = utils.Uint128AStringDecimal(transferenciaTB.UserData128)
 	} else {
@@ -79,7 +80,7 @@ func (t *Transferencias) Dame() error {
 		idCuentaEmpresa, errParse := utils.ParsearUint128(moneda.IdCuentaEmpresa)
 		if errParse == nil {
 			var idCuentaUsuario types.Uint128
-			if t.Code == CodigoTransferenciaReversion {
+			if code == CodigoTransferenciaReversion {
 				t.Tipo = "R"
 				// En reversión las cuentas están invertidas
 				if transferenciaTB.DebitAccountID == idCuentaEmpresa {

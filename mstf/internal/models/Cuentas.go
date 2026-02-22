@@ -17,8 +17,8 @@ type Cuentas struct {
 	Creditos       string
 	Debitos        string
 	Estado         string
-	FechaAlta      string
-	FechaRegistro  string
+	Fecha          string
+	FechaProceso   string
 }
 
 // TODO: limite se tiene que obtener de db relacional
@@ -56,17 +56,17 @@ func (c *Cuentas) Dame() error {
 	c.Creditos = utils.Uint128AStringDecimal(cuentaTB.CreditsPosted)
 	c.Debitos = utils.Uint128AStringDecimal(cuentaTB.DebitsPosted)
 
-	// Leer FechaAlta desde UserData32
+	// Leer Fecha desde UserData32
 	if cuentaTB.UserData32 != 0 {
-		fechaAlta, err := utils.UserData32AFecha(cuentaTB.UserData32)
+		fecha, err := utils.UserData32AFecha(cuentaTB.UserData32)
 		if err == nil {
-			c.FechaAlta = fechaAlta
+			c.Fecha = fecha
 		}
 	}
 
-	// Leer FechaRegistro desde Timestamp de TB
+	// Leer FechaProceso desde Timestamp de TB
 	if cuentaTB.Timestamp != 0 {
-		c.FechaRegistro = utils.TimestampAFecha(cuentaTB.Timestamp)
+		c.FechaProceso = utils.TimestampAFecha(cuentaTB.Timestamp)
 	}
 
 	closedFlags := types.AccountFlags{Closed: true}.ToUint16()

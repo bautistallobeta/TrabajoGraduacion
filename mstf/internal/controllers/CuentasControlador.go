@@ -141,7 +141,7 @@ func (cc *CuentasControlador) Crear(c echo.Context) error {
 	type crearCuentaRequest struct {
 		IdUsuarioFinal uint64 `json:"IdUsuarioFinal"`
 		IdMoneda       uint32 `json:"IdMoneda"`
-		FechaAlta      string `json:"FechaAlta"`
+		Fecha          string `json:"Fecha"`
 	}
 
 	req := &crearCuentaRequest{}
@@ -153,12 +153,12 @@ func (cc *CuentasControlador) Crear(c echo.Context) error {
 	if req.IdUsuarioFinal <= 0 || req.IdMoneda <= 0 {
 		return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta("Faltan campos requeridos: IdUsuarioFinal, IdMoneda"))
 	}
-	if req.FechaAlta == "" {
-		return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta("Falta campo requerido: FechaAlta"))
+	if req.Fecha == "" {
+		return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta("Falta campo requerido: Fecha"))
 	}
 
 	// cuentas creadas vía API siempre tienen DebitsMustNotExceedCredits = true
-	idCuentaTBString, err := cc.Gestor.Crear(req.IdMoneda, req.IdUsuarioFinal, req.FechaAlta, true)
+	idCuentaTBString, err := cc.Gestor.Crear(req.IdMoneda, req.IdUsuarioFinal, req.Fecha, true)
 	log.Printf("\n\nCuentasControlador.Crear: Resultado de creación en GestorCuentas: mensaje='%s', error='%v'", idCuentaTBString, err)
 	if err != nil {
 		return c.JSON(http.StatusConflict, models.NewErrorRespuesta("Error al crear cuenta: "+err.Error()))
@@ -236,16 +236,16 @@ func (cc *CuentasControlador) Buscar(c echo.Context) error {
 		} else {
 			cuenta.Estado = "A"
 		}
-		// FechaAlta se lee de UserData32
+		// Fecha se lee de UserData32
 		if cuentaTB.UserData32 != 0 {
-			fechaAlta, err := utils.UserData32AFecha(cuentaTB.UserData32)
+			fecha, err := utils.UserData32AFecha(cuentaTB.UserData32)
 			if err == nil {
-				cuenta.FechaAlta = fechaAlta
+				cuenta.Fecha = fecha
 			}
 		}
-		// FechaRegistro se lee de Timestamp de TB
+		// FechaProceso se lee de Timestamp de TB
 		if cuentaTB.Timestamp != 0 {
-			cuenta.FechaRegistro = utils.TimestampAFecha(cuentaTB.Timestamp)
+			cuenta.FechaProceso = utils.TimestampAFecha(cuentaTB.Timestamp)
 		}
 
 		respuesta = append(respuesta, cuenta)

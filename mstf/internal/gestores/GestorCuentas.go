@@ -14,7 +14,7 @@ import (
 type CuentaNueva struct {
 	IdMoneda                      uint32
 	IdUsuarioFinal                uint64
-	FechaAlta                     string
+	Fecha                         string
 	DebitosNoDebenExcederCreditos bool
 }
 
@@ -147,7 +147,7 @@ func (gc *GestorCuentas) Crear(idMoneda uint32, idUsuarioFinal uint64, fechaAlta
 
 	fechaAltaUint32, err := utils.FechaAUserData32(fechaAlta)
 	if err != nil {
-		return "", errors.New("Formato de FechaAlta inválido: " + err.Error())
+		return "", errors.New("Formato de Fecha inválido: " + err.Error())
 	}
 
 	cuentaTB := types.Account{
@@ -208,9 +208,9 @@ func (gc *GestorCuentas) CrearLote(cuentas []CuentaNueva) ([]string, error) {
 			return nil, fmt.Errorf("IdCuenta formato incorrecto (IdMoneda=%d, Usuario=%d)", c.IdMoneda, c.IdUsuarioFinal)
 		}
 
-		fechaAltaUint32, err := utils.FechaAUserData32(c.FechaAlta)
+		fechaAltaUint32, err := utils.FechaAUserData32(c.Fecha)
 		if err != nil {
-			return nil, fmt.Errorf("Formato de FechaAlta inválido para cuenta IdMoneda=%d: %v", c.IdMoneda, err)
+			return nil, fmt.Errorf("Formato de Fecha inválido para cuenta IdMoneda=%d: %v", c.IdMoneda, err)
 		}
 
 		cuentaTB := types.Account{

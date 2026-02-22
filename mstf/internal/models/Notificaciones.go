@@ -3,7 +3,6 @@ package models
 import (
 	"MSTransaccionesFinancieras/internal/utils"
 	"strconv"
-	"time"
 
 	"github.com/tigerbeetle/tigerbeetle-go/pkg/types"
 )
@@ -19,7 +18,6 @@ type TransferenciaNotificada struct {
 	Estado          string `json:"Estado"`
 	Mensaje         string `json:"Mensaje"`
 	Fecha           string `json:"Fecha"`
-	FechaProceso    string `json:"FechaProceso"`
 }
 
 // struct que se envía a traves del Webhook
@@ -57,12 +55,6 @@ func NewTransferenciaNotificada(transfer types.Transfer, kafkaMsg KafkaTransfere
 		fecha = kafkaMsg.Fecha
 	}
 
-	// FechaProceso: timestamp de cuando TB procesó la transfer.
-	fechaProceso := "-"
-	if estado == "F" {
-		fechaProceso = time.Now().UTC().Format("2006-01-02 15:04:05")
-	}
-
 	return TransferenciaNotificada{
 		IdTransferencia: utils.Uint128AStringDecimal(transfer.ID),
 		IdUsuarioFinal:  kafkaMsg.IdUsuarioFinal,
@@ -73,7 +65,6 @@ func NewTransferenciaNotificada(transfer types.Transfer, kafkaMsg KafkaTransfere
 		Estado:          estado,
 		Mensaje:         mensaje,
 		Fecha:           fecha,
-		FechaProceso:    fechaProceso,
 	}
 }
 
@@ -93,7 +84,6 @@ func NewTransferenciaNotificadaError(transfer types.Transfer, kafkaMsg KafkaTran
 		Estado:          "E",
 		Mensaje:         mensajeError,
 		Fecha:           fecha,
-		FechaProceso:    "-",
 	}
 }
 
@@ -117,6 +107,5 @@ func NewTransferenciaNotificadaParseoError(kafkaMsg KafkaTransferencias, mensaje
 		Estado:          "E",
 		Mensaje:         mensajeError,
 		Fecha:           fecha,
-		FechaProceso:    "-",
 	}
 }

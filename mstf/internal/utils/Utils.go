@@ -124,9 +124,10 @@ func UserData32AFecha(u uint32) (string, error) {
 	return t.Format("2006-01-02 15:04:05"), nil
 }
 
-// Convierte un timestamp de TigerBeetle  a string
+// Convierte un timestamp de TigerBeetle a string en hora Argentina (UTC-3).
 func TimestampAFecha(timestamp uint64) string {
-	t := time.Unix(0, int64(timestamp)).UTC()
+	art := time.FixedZone("ART", -3*60*60)
+	t := time.Unix(0, int64(timestamp)).In(art)
 	return t.Format("2006-01-02 15:04:05.999999999")
 }
 
