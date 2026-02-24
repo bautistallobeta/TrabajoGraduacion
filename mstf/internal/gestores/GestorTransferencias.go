@@ -93,6 +93,9 @@ func (gt *GestorTransferencias) Buscar(
 		}
 
 		for _, t := range transfers {
+			if t.Code == models.CodigoTransferenciaCierre {
+				continue
+			}
 			if !pasaFiltroMonto(t, montoMin, montoMax) {
 				continue
 			}
@@ -295,11 +298,16 @@ func (gt *GestorTransferencias) preValidarCuentas(batch []types.Transfer) ([]str
 			errores[i] = "Cuenta no encontrada"
 			continue
 		}
-		if _, existeCredit := mapaAccounts[t.CreditAccountID]; !existeCredit {
+		creditAccount, existeCredit := mapaAccounts[t.CreditAccountID]
+		if !existeCredit {
 			errores[i] = "Cuenta no encontrada"
 			continue
 		}
 		if (debitAccount.Flags & flagCerrada) != 0 {
+			errores[i] = "La cuenta está cerrada"
+			continue
+		}
+		if (creditAccount.Flags & flagCerrada) != 0 {
 			errores[i] = "La cuenta está cerrada"
 			continue
 		}

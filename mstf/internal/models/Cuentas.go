@@ -80,18 +80,6 @@ func (c *Cuentas) Dame() error {
 	return nil
 }
 
-// TODO
-func (c *Cuentas) Activar() (string, error) {
-	c.Estado = "A"
-	return "Activada", nil
-}
-
-// TODO
-func (c *Cuentas) Desactivar() (string, error) {
-	c.Estado = "I"
-	return "Desactivada", nil
-}
-
 func (c *Cuentas) DameHistorialBalances(timestampMin uint64, timestampMax uint64, limite uint32) ([]types.AccountBalance, error) {
 	if c.IdUsuarioFinal <= 0 || c.IdMoneda <= 0 {
 		return nil, errors.New("IdUsuarioFinal e IdMoneda son requeridos y deben ser mayores a cero")

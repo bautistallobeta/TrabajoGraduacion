@@ -174,6 +174,50 @@ func (cc *CuentasControlador) Crear(c echo.Context) error {
 	})
 }
 
+func (cc *CuentasControlador) Desactivar(c echo.Context) error {
+	type Request struct {
+		IdUsuarioFinal uint64 `param:"idusuariofinal"`
+		IdMoneda       uint32 `param:"idmoneda"`
+	}
+
+	req := &Request{}
+	if err := c.Bind(req); err != nil {
+		return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta("Parámetros inválidos: "+err.Error()))
+	}
+	if req.IdUsuarioFinal <= 0 || req.IdMoneda <= 0 {
+		return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta("IdUsuarioFinal e IdMoneda son requeridos y deben ser mayores a cero"))
+	}
+
+	if err := cc.Gestor.Desactivar(req.IdMoneda, req.IdUsuarioFinal); err != nil {
+		return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta("Error al desactivar cuenta: "+err.Error()))
+	}
+	return c.JSON(http.StatusOK, map[string]interface{}{
+		"Mensaje": "Cuenta desactivada exitosamente",
+	})
+}
+
+func (cc *CuentasControlador) Activar(c echo.Context) error {
+	type Request struct {
+		IdUsuarioFinal uint64 `param:"idusuariofinal"`
+		IdMoneda       uint32 `param:"idmoneda"`
+	}
+
+	req := &Request{}
+	if err := c.Bind(req); err != nil {
+		return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta("Parámetros inválidos: "+err.Error()))
+	}
+	if req.IdUsuarioFinal <= 0 || req.IdMoneda <= 0 {
+		return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta("IdUsuarioFinal e IdMoneda son requeridos y deben ser mayores a cero"))
+	}
+
+	if err := cc.Gestor.Activar(req.IdMoneda, req.IdUsuarioFinal); err != nil {
+		return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta("Error al activar cuenta: "+err.Error()))
+	}
+	return c.JSON(http.StatusOK, map[string]interface{}{
+		"Mensaje": "Cuenta activada exitosamente",
+	})
+}
+
 func (cc *CuentasControlador) Buscar(c echo.Context) error {
 	// IdsUsuarioFinal e IdsMoneda: arrays paralelos para lookup directo. Deben tener la misma cantidad.
 	idsUsuarioFinalStr := c.QueryParams()["IdsUsuarioFinal"]

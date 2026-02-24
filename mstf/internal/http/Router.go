@@ -49,6 +49,8 @@ func initRoutes(router *echo.Echo, notificador *webhook.Notificador, productor *
 	router.GET("/cuentas/:idusuariofinal/:idmoneda", cuentasControlador.Dame)
 	router.POST("/cuentas", cuentasControlador.Crear)
 	router.GET("/cuentas", cuentasControlador.Buscar)
+	router.PUT("/cuentas/:idusuariofinal/:idmoneda/desactivar", cuentasControlador.Desactivar)
+	router.PUT("/cuentas/:idusuariofinal/:idmoneda/activar", cuentasControlador.Activar)
 
 	//Transferencias
 	router.GET("/transferencias/:idtransferencia", transferenciasControlador.Dame)

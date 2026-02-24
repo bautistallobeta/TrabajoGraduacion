@@ -12,6 +12,7 @@ import (
 
 const CodigoTransferenciaNormal uint16 = 1
 const CodigoTransferenciaReversion uint16 = 2
+const CodigoTransferenciaCierre uint16 = 3
 
 // "wrapper" de Transfer de TB
 type Transferencias struct {
@@ -65,7 +66,7 @@ func (t *Transferencias) Dame() error {
 	t.IdCuentaDebito = utils.Uint128AStringDecimal(transferenciaTB.DebitAccountID)
 	t.IdCuentaCredito = utils.Uint128AStringDecimal(transferenciaTB.CreditAccountID)
 	t.IdMoneda = transferenciaTB.Ledger
-	t.Monto = utils.Uint128AStringDecimal(transferenciaTB.Amount)
+	t.Monto = utils.Uint128ADecimalMoneda(transferenciaTB.Amount)
 	t.Categoria = transferenciaTB.UserData64
 	t.Fecha = fecha
 	t.FechaProceso = utils.TimestampAFecha(transferenciaTB.Timestamp)
