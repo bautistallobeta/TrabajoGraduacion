@@ -187,8 +187,8 @@ func (c *Consumidor) parseKafkaMessage(msg kafka.Message) (types.Transfer, model
 	if kafkaMsg.Tipo != "I" && kafkaMsg.Tipo != "E" && kafkaMsg.Tipo != "R" {
 		return types.Transfer{}, kafkaMsg, errors.New("Tipo debe ser 'I' (ingreso), 'E' (egreso) o 'R' (reversión)")
 	}
-	if kafkaMsg.Tipo != "R" && kafkaMsg.Monto == 0 {
-		return types.Transfer{}, kafkaMsg, errors.New("Monto no puede ser cero")
+	if kafkaMsg.Tipo != "R" && kafkaMsg.Monto <= 0 {
+		return types.Transfer{}, kafkaMsg, errors.New("Monto debe ser mayor a cero")
 	}
 
 	idTransferenciaCast, err := utils.ParsearUint128(kafkaMsg.IdTransferencia)
@@ -237,7 +237,7 @@ func (c *Consumidor) parseKafkaMessage(msg kafka.Message) (types.Transfer, model
 		ID:              idTransferenciaCast,
 		DebitAccountID:  debitAccountID,
 		CreditAccountID: creditAccountID,
-		Amount:          types.ToUint128(kafkaMsg.Monto),
+		Amount:          types.ToUint128(utils.MontoDecimalAUnidadMinima(kafkaMsg.Monto)),
 		Ledger:          kafkaMsg.IdMoneda,
 		Code:            models.CodigoTransferenciaNormal,
 		UserData128:     types.ToUint128(kafkaMsg.IdUsuarioFinal), // permite filtrar por usuario en QueryTransfers

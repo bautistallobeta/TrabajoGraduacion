@@ -127,20 +127,20 @@ func (tc *TransferenciasControlador) Buscar(c echo.Context) error {
 
 	var montoMin uint64 = 0
 	if s := c.QueryParam("MontoMin"); s != "" {
-		parsed, err := strconv.ParseUint(s, 10, 64)
-		if err != nil {
+		parsed, err := strconv.ParseFloat(s, 64)
+		if err != nil || parsed < 0 {
 			return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta("MontoMin debe ser un número válido"))
 		}
-		montoMin = parsed
+		montoMin = utils.MontoDecimalAUnidadMinima(parsed)
 	}
 
 	var montoMax uint64 = 0
 	if s := c.QueryParam("MontoMax"); s != "" {
-		parsed, err := strconv.ParseUint(s, 10, 64)
-		if err != nil {
+		parsed, err := strconv.ParseFloat(s, 64)
+		if err != nil || parsed < 0 {
 			return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta("MontoMax debe ser un número válido"))
 		}
-		montoMax = parsed
+		montoMax = utils.MontoDecimalAUnidadMinima(parsed)
 	}
 
 	if montoMin != 0 && montoMax != 0 && montoMin > montoMax {

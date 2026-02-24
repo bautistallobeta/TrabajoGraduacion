@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"strconv"
 	"strings"
 	"time"
 
@@ -158,4 +159,36 @@ func MD5Hash(text string) string {
 	hasher := md5.New()
 	hasher.Write([]byte(text))
 	return hex.EncodeToString(hasher.Sum(nil))
+}
+
+// Convierte un monto decimal a unidad mínima (centavos) multiplicando por 100.
+// Trunca en 2 decimales: 15.559 → 1555, 15.5 → 1550, 15 → 1500.
+// Usa representación string para evitar errores de aritmética flotante.
+func MontoDecimalAUnidadMinima(monto float64) uint64 {
+	if monto <= 0 {
+		return 0
+	}
+	s := strconv.FormatFloat(monto, 'f', 4, 64)
+	partes := strings.SplitN(s, ".", 2)
+	entera := partes[0]
+	decimal := ""
+	if len(partes) > 1 {
+		decimal = partes[1]
+	}
+	for len(decimal) < 2 {
+		decimal += "0"
+	}
+	decimal = decimal[:2]
+	resultado, _ := strconv.ParseUint(entera+decimal, 10, 64)
+	return resultado
+}
+
+// Convierte un monto en unidad mínima (centavos) almacenado en TB a string decimal con 2 cifras.
+// Ej: 1550 → "15.50"
+func Uint128ADecimalMoneda(monto types.Uint128) string {
+	n, _ := new(big.Int).SetString(Uint128AStringDecimal(monto), 10)
+	cien := big.NewInt(100)
+	entero, resto := new(big.Int), new(big.Int)
+	entero.DivMod(n, cien, resto)
+	return fmt.Sprintf("%s.%02d", entero.String(), resto.Int64())
 }

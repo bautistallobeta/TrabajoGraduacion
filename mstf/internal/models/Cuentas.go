@@ -53,8 +53,8 @@ func (c *Cuentas) Dame() error {
 	c.IdCuenta = utils.Uint128AStringDecimal(cuentaTB.ID)
 	c.IdUsuarioFinal = cuentaTB.UserData64
 	c.IdMoneda = cuentaTB.Ledger
-	c.Creditos = utils.Uint128AStringDecimal(cuentaTB.CreditsPosted)
-	c.Debitos = utils.Uint128AStringDecimal(cuentaTB.DebitsPosted)
+	c.Creditos = utils.Uint128ADecimalMoneda(cuentaTB.CreditsPosted)
+	c.Debitos = utils.Uint128ADecimalMoneda(cuentaTB.DebitsPosted)
 
 	// Leer Fecha desde UserData32
 	if cuentaTB.UserData32 != 0 {
@@ -104,7 +104,7 @@ func (c *Cuentas) DameHistorialBalances(timestampMin uint64, timestampMax uint64
 		TimestampMin: timestampMin,
 		TimestampMax: timestampMax,
 		Limit:        limite,
-		Flags:        0,
+		Flags:        3, // Debits(1) + Credits(2)
 	}
 
 	balances, err := persistence.ClienteTB.GetAccountBalances(filtro)

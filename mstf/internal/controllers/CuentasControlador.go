@@ -4,7 +4,9 @@ import (
 	"MSTransaccionesFinancieras/internal/gestores"
 	"MSTransaccionesFinancieras/internal/models"
 	"MSTransaccionesFinancieras/internal/utils"
+	"fmt"
 	"log"
+	"math/big"
 	"net/http"
 	"strconv"
 
@@ -114,15 +116,24 @@ func (cc *CuentasControlador) DameHistorial(c echo.Context) error {
 	}
 
 	historial := make([]BalanceHistorial, 0, len(balances))
+	cien := big.NewInt(100)
 	for _, balance := range balances {
-		creditos := balance.CreditsPosted.BigInt()
-		debitos := balance.DebitsPosted.BigInt()
-		balanceNeto := creditos.Sub(&creditos, &debitos)
+		creditosRaw := balance.CreditsPosted.BigInt()
+		debitosRaw := balance.DebitsPosted.BigInt()
+		balanceRaw := new(big.Int).Sub(&creditosRaw, &debitosRaw)
+
+		signo := ""
+		if balanceRaw.Sign() < 0 {
+			signo = "-"
+			balanceRaw.Neg(balanceRaw)
+		}
+		entero, resto := new(big.Int), new(big.Int)
+		entero.DivMod(balanceRaw, cien, resto)
 
 		historial = append(historial, BalanceHistorial{
-			Debitos:   utils.Uint128AStringDecimal(balance.DebitsPosted),
-			Creditos:  utils.Uint128AStringDecimal(balance.CreditsPosted),
-			Balance:   balanceNeto.String(),
+			Debitos:   utils.Uint128ADecimalMoneda(balance.DebitsPosted),
+			Creditos:  utils.Uint128ADecimalMoneda(balance.CreditsPosted),
+			Balance:   fmt.Sprintf("%s%s.%02d", signo, entero.String(), resto.Int64()),
 			Timestamp: balance.Timestamp,
 		})
 	}
@@ -303,8 +314,8 @@ func (cc *CuentasControlador) Buscar(c echo.Context) error {
 			IdCuenta:       utils.Uint128AStringDecimal(cuentaTB.ID),
 			IdUsuarioFinal: cuentaTB.UserData64,
 			IdMoneda:       cuentaTB.Ledger,
-			Creditos:       utils.Uint128AStringDecimal(cuentaTB.CreditsPosted),
-			Debitos:        utils.Uint128AStringDecimal(cuentaTB.DebitsPosted),
+			Creditos:       utils.Uint128ADecimalMoneda(cuentaTB.CreditsPosted),
+			Debitos:        utils.Uint128ADecimalMoneda(cuentaTB.DebitsPosted),
 		}
 		//Leer el estado
 		closedFlags := types.AccountFlags{Closed: true}.ToUint16()

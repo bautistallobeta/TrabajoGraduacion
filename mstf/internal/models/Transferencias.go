@@ -124,7 +124,7 @@ func (t *Transferencias) PoblarDesdeTB(tb types.Transfer) {
 	t.IdCuentaDebito = utils.Uint128AStringDecimal(tb.DebitAccountID)
 	t.IdCuentaCredito = utils.Uint128AStringDecimal(tb.CreditAccountID)
 	t.IdMoneda = tb.Ledger
-	t.Monto = utils.Uint128AStringDecimal(tb.Amount)
+	t.Monto = utils.Uint128ADecimalMoneda(tb.Amount)
 	t.Categoria = tb.UserData64
 
 	if tb.Code == CodigoTransferenciaReversion {

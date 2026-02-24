@@ -58,7 +58,7 @@ func NewTransferenciaNotificada(transfer types.Transfer, kafkaMsg KafkaTransfere
 	return TransferenciaNotificada{
 		IdTransferencia: utils.Uint128AStringDecimal(transfer.ID),
 		IdUsuarioFinal:  kafkaMsg.IdUsuarioFinal,
-		Monto:           utils.Uint128AStringDecimal(transfer.Amount),
+		Monto:           utils.Uint128ADecimalMoneda(transfer.Amount),
 		IdMoneda:        transfer.Ledger,
 		Tipo:            kafkaMsg.Tipo,
 		Categoria:       transfer.UserData64,
@@ -77,7 +77,7 @@ func NewTransferenciaNotificadaError(transfer types.Transfer, kafkaMsg KafkaTran
 	return TransferenciaNotificada{
 		IdTransferencia: utils.Uint128AStringDecimal(transfer.ID),
 		IdUsuarioFinal:  kafkaMsg.IdUsuarioFinal,
-		Monto:           utils.Uint128AStringDecimal(transfer.Amount),
+		Monto:           utils.Uint128ADecimalMoneda(transfer.Amount),
 		IdMoneda:        transfer.Ledger,
 		Tipo:            kafkaMsg.Tipo,
 		Categoria:       kafkaMsg.IdCategoria,
@@ -100,7 +100,7 @@ func NewTransferenciaNotificadaParseoError(kafkaMsg KafkaTransferencias, mensaje
 	return TransferenciaNotificada{
 		IdTransferencia: idTransferencia,
 		IdUsuarioFinal:  kafkaMsg.IdUsuarioFinal,
-		Monto:           strconv.FormatUint(kafkaMsg.Monto, 10),
+		Monto:           strconv.FormatFloat(kafkaMsg.Monto, 'f', 2, 64),
 		IdMoneda:        kafkaMsg.IdMoneda,
 		Tipo:            kafkaMsg.Tipo,
 		Categoria:       kafkaMsg.IdCategoria,

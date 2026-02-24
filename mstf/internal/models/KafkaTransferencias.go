@@ -4,7 +4,7 @@ package models
 type KafkaTransferencias struct {
 	IdTransferencia string `json:"IdTransferencia"`
 	IdUsuarioFinal  uint64 `json:"IdUsuarioFinal"`
-	Monto           uint64 `json:"Monto"`
+	Monto           float64 `json:"Monto"`
 	IdMoneda        uint32 `json:"IdMoneda"`
 	Tipo            string `json:"Tipo"`
 	IdCategoria     uint64 `json:"IdCategoria"`
