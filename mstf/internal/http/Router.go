@@ -20,7 +20,7 @@ func InitRouter(notificador *webhook.Notificador, productor *kafkamstf.Productor
 		middleware.Recover(),
 		middleware.Logger(),
 		middleware.CORS(),
-		httpMiddleware.TokenAuth(),
+		httpMiddleware.AutenticacionDual(),
 	)
 
 	initRoutes(e, notificador, productor)
