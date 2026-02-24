@@ -4,9 +4,12 @@ import (
 	"MSTransaccionesFinancieras/internal/gestores"
 	kafka "MSTransaccionesFinancieras/internal/infra/kafkamstf"
 	"MSTransaccionesFinancieras/internal/models"
+	"MSTransaccionesFinancieras/internal/utils"
 	"net/http"
+	"strconv"
 
 	"github.com/labstack/echo/v4"
+	"github.com/tigerbeetle/tigerbeetle-go/pkg/types"
 )
 
 type TransferenciasControlador struct {
@@ -72,5 +75,125 @@ func (tc *TransferenciasControlador) Crear(c echo.Context) error {
 	return c.JSON(http.StatusAccepted, map[string]interface{}{
 		"Mensaje": "Transferencia aceptada y encolada en Kafka.",
 		"Id":      req.IdTransferencia,
+	})
+}
+
+func (tc *TransferenciasControlador) Buscar(c echo.Context) error {
+	// IdsTransferencia: array de IDs (repeated query param). Si se recibe, camino directo LookupTransfers.
+	idsStr := c.QueryParams()["IdsTransferencia"]
+	var idsTransferencia []types.Uint128
+	if len(idsStr) > 0 {
+		idsTransferencia = make([]types.Uint128, 0, len(idsStr))
+		for _, s := range idsStr {
+			id, err := utils.ParsearUint128(s)
+			if err != nil {
+				return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta("IdsTransferencia contiene un ID inválido: "+s))
+			}
+			idsTransferencia = append(idsTransferencia, id)
+		}
+	}
+
+	var idUsuarioFinal uint64 = 0
+	if s := c.QueryParam("IdUsuarioFinal"); s != "" {
+		parsed, err := strconv.ParseUint(s, 10, 64)
+		if err != nil {
+			return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta("IdUsuarioFinal debe ser un número válido"))
+		}
+		idUsuarioFinal = parsed
+	}
+
+	var idCategoria uint64 = 0
+	if s := c.QueryParam("IdCategoria"); s != "" {
+		parsed, err := strconv.ParseUint(s, 10, 64)
+		if err != nil {
+			return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta("IdCategoria debe ser un número válido"))
+		}
+		idCategoria = parsed
+	}
+
+	var idMoneda uint32 = 0
+	if s := c.QueryParam("IdMoneda"); s != "" {
+		parsed, err := strconv.ParseUint(s, 10, 32)
+		if err != nil {
+			return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta("IdMoneda debe ser un número válido"))
+		}
+		idMoneda = uint32(parsed)
+	}
+
+	estado := c.QueryParam("Estado")
+	if estado != "" && estado != "F" && estado != "R" {
+		return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta("Estado debe ser 'F' (finalizada), 'R' (revertida), o vacío"))
+	}
+
+	var montoMin uint64 = 0
+	if s := c.QueryParam("MontoMin"); s != "" {
+		parsed, err := strconv.ParseUint(s, 10, 64)
+		if err != nil {
+			return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta("MontoMin debe ser un número válido"))
+		}
+		montoMin = parsed
+	}
+
+	var montoMax uint64 = 0
+	if s := c.QueryParam("MontoMax"); s != "" {
+		parsed, err := strconv.ParseUint(s, 10, 64)
+		if err != nil {
+			return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta("MontoMax debe ser un número válido"))
+		}
+		montoMax = parsed
+	}
+
+	if montoMin != 0 && montoMax != 0 && montoMin > montoMax {
+		return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta("MontoMin no puede ser mayor a MontoMax"))
+	}
+
+	var timestampMin uint64 = 0
+	if s := c.QueryParam("FechaDesde"); s != "" {
+		ts, err := utils.FechaATimestampNS(s)
+		if err != nil {
+			return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta("FechaDesde inválida: "+err.Error()))
+		}
+		timestampMin = ts
+	}
+
+	var timestampMax uint64 = 0
+	if s := c.QueryParam("FechaHasta"); s != "" {
+		ts, err := utils.FechaATimestampNS(s)
+		if err != nil {
+			return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta("FechaHasta inválida: "+err.Error()))
+		}
+		timestampMax = ts
+	}
+
+	var limite uint32 = 100
+	if s := c.QueryParam("Limite"); s != "" {
+		parsed, err := strconv.ParseUint(s, 10, 32)
+		if err != nil {
+			return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta("Limite debe ser un número válido"))
+		}
+		if parsed > 500 {
+			return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta("Limite no puede ser mayor a 500"))
+		}
+		if parsed == 0 {
+			return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta("Limite debe ser mayor a 0"))
+		}
+		limite = uint32(parsed)
+	}
+
+	transfers, err := tc.Gestor.Buscar(idsTransferencia, idUsuarioFinal, idCategoria, idMoneda, estado, montoMin, montoMax, timestampMin, timestampMax, limite)
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, models.NewErrorRespuesta("Error al buscar transferencias: "+err.Error()))
+	}
+
+	respuesta := make([]models.Transferencias, 0, len(transfers))
+	for _, t := range transfers {
+		var tr models.Transferencias
+		tr.PoblarDesdeTB(t)
+		respuesta = append(respuesta, tr)
+	}
+
+	return c.JSON(http.StatusOK, map[string]interface{}{
+		"Total":          len(respuesta),
+		"Transferencias": respuesta,
 	})
 }

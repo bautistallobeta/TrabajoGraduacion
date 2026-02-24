@@ -131,6 +131,28 @@ func TimestampAFecha(timestamp uint64) string {
 	return t.Format("2006-01-02 15:04:05.999999999")
 }
 
+// Convierte un string de fecha a uint64 (nanosegundos desde epoch) para TimestampMin/Max de QueryFilter.
+func FechaATimestampNS(s string) (uint64, error) {
+	layouts := []string{
+		"2006-01-02 15:04:05",
+		"2006-01-02T15:04:05",
+		time.RFC3339,
+		"2006-01-02",
+	}
+	var t time.Time
+	var err error
+	for _, l := range layouts {
+		t, err = time.ParseInLocation(l, s, time.UTC)
+		if err == nil {
+			break
+		}
+	}
+	if err != nil {
+		return 0, errors.New("Formato de fecha inválido; esperado 'YYYY-MM-DD HH:MM:SS' o similar")
+	}
+	return uint64(t.UnixNano()), nil
+}
+
 // Convierte string a hash md5
 func MD5Hash(text string) string {
 	hasher := md5.New()

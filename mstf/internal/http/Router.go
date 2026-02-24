@@ -52,6 +52,7 @@ func initRoutes(router *echo.Echo, notificador *webhook.Notificador, productor *
 
 	//Transferencias
 	router.GET("/transferencias/:idtransferencia", transferenciasControlador.Dame)
+	router.GET("/transferencias", transferenciasControlador.Buscar)
 	router.POST("/transferencias", transferenciasControlador.Crear)
 
 	// Usuarios

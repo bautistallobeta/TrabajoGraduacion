@@ -23,6 +23,110 @@ func NewGestorTransferencias(notificador *webhook.Notificador) *GestorTransferen
 	}
 }
 
+// Busca transferencias según los filtros especificados.
+// Si idsTransferencia tiene elementos, hace LookupTransfers directo e ignora el resto de filtros.
+// Parámetros numéricos con valor 0 deshabilitan ese filtro en TigerBeetle.
+// estado: "F" para finalizadas, "R" para revertidas, "" para todas.
+// montoMin/montoMax: filtrado client-side, 0 = sin límite.
+// timestampMin/timestampMax: nanosegundos epoch (Timestamp de TB, no UserData32).
+// Los resultados se ordenan de más reciente a más antigua.
+func (gt *GestorTransferencias) Buscar(
+	idsTransferencia []types.Uint128,
+	idUsuarioFinal uint64,
+	idCategoria uint64,
+	idMoneda uint32,
+	estado string,
+	montoMin uint64,
+	montoMax uint64,
+	timestampMin uint64,
+	timestampMax uint64,
+	limit uint32,
+) ([]types.Transfer, error) {
+	if persistence.ClienteTB == nil {
+		return nil, errors.New("Conexión a TigerBeetle no inicializada")
+	}
+
+	// Camino A: lookup directo por IDs (ignora el resto de parámetros)
+	if len(idsTransferencia) > 0 {
+		return persistence.ClienteTB.LookupTransfers(idsTransferencia)
+	}
+
+	// Mapear estado a Code de TB
+	var codigo uint16 = 0
+	switch estado {
+	case "F":
+		codigo = models.CodigoTransferenciaNormal
+	case "R":
+		codigo = models.CodigoTransferenciaReversion
+	}
+
+	resultados := make([]types.Transfer, 0)
+	cursorTimestampMax := timestampMax // avanza hacia atrás en cada página (reversed=true)
+
+	for {
+		restantes := limit - uint32(len(resultados))
+		if restantes == 0 {
+			break
+		}
+
+		filter := types.QueryFilter{
+			UserData128:  types.ToUint128(idUsuarioFinal),
+			UserData64:   idCategoria,
+			UserData32:   0,
+			Code:         codigo,
+			Ledger:       idMoneda,
+			TimestampMin: timestampMin,
+			TimestampMax: cursorTimestampMax,
+			Limit:        restantes,
+			Flags:        types.QueryFilterFlags{Reversed: true}.ToUint32(),
+		}
+
+		log.Printf("GestorTransferencias.Buscar: Ejecutando QueryTransfers (TimestampMax=%d, Limit=%d)", cursorTimestampMax, restantes)
+		transfers, err := persistence.ClienteTB.QueryTransfers(filter)
+		if err != nil {
+			log.Printf("ERROR [GestorTransferencias.Buscar]: QueryTransfers falló: %v", err)
+			return nil, err
+		}
+
+		if len(transfers) == 0 {
+			break
+		}
+
+		for _, t := range transfers {
+			if !pasaFiltroMonto(t, montoMin, montoMax) {
+				continue
+			}
+			resultados = append(resultados, t)
+			if uint32(len(resultados)) >= limit {
+				break
+			}
+		}
+
+		if uint32(len(transfers)) < restantes {
+			break
+		}
+
+		if uint32(len(resultados)) >= limit {
+			break
+		}
+
+		// el último elemento es el más antiguo del batch (reversed=true); avanzar cursor hacia atrás
+		ultimoTimestamp := transfers[len(transfers)-1].Timestamp
+		if ultimoTimestamp == 0 {
+			break
+		}
+		cursorTimestampMax = ultimoTimestamp - 1
+
+		if len(resultados) > 50000 {
+			log.Printf("ADVERTENCIA [GestorTransferencias.Buscar]: Límite de seguridad alcanzado (50.000 transferencias)")
+			break
+		}
+	}
+
+	log.Printf("GestorTransferencias.Buscar: Total encontrado: %d transferencias", len(resultados))
+	return resultados, nil
+}
+
 // Procesa un lote de transferencias recibido del consumidor Kafka.
 // Valida reglas de negocio antes de enviar a TigerBeetle.
 // Las transferencias que fallan validación no van a TB pero sí se notifican con su error.
@@ -257,4 +361,20 @@ func (gt *GestorTransferencias) validarReversion(t types.Transfer, kafkaMsg mode
 	}
 
 	return "", nil
+}
+
+// retorna false si el monto de la transfer está fuera del rango [montoMin, montoMax].
+// Un valor 0 en alguno de los límites desactiva ese extremo del rango.
+func pasaFiltroMonto(t types.Transfer, montoMin, montoMax uint64) bool {
+	if montoMin == 0 && montoMax == 0 {
+		return true
+	}
+	monto := binary.LittleEndian.Uint64(t.Amount[:8])
+	if montoMin != 0 && monto < montoMin {
+		return false
+	}
+	if montoMax != 0 && monto > montoMax {
+		return false
+	}
+	return true
 }

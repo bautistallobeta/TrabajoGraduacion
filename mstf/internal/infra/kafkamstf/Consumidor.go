@@ -240,6 +240,7 @@ func (c *Consumidor) parseKafkaMessage(msg kafka.Message) (types.Transfer, model
 		Amount:          types.ToUint128(kafkaMsg.Monto),
 		Ledger:          kafkaMsg.IdMoneda,
 		Code:            models.CodigoTransferenciaNormal,
+		UserData128:     types.ToUint128(kafkaMsg.IdUsuarioFinal), // permite filtrar por usuario en QueryTransfers
 		UserData64:      kafkaMsg.IdCategoria,
 		UserData32:      timeStampUint32,
 	}

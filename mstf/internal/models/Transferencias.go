@@ -1,6 +1,7 @@
 package models
 
 import (
+	"encoding/binary"
 	"errors"
 
 	"MSTransaccionesFinancieras/internal/infra/persistence"
@@ -15,6 +16,8 @@ const CodigoTransferenciaReversion uint16 = 2
 // "wrapper" de Transfer de TB
 type Transferencias struct {
 	IdTransferencia         string
+	IdCuentaDebito          string
+	IdCuentaCredito         string
 	IdUsuarioFinal          uint64
 	IdMoneda                uint32
 	Monto                   string
@@ -59,6 +62,8 @@ func (t *Transferencias) Dame() error {
 		fecha, _ = utils.UserData128AFecha(transferenciaTB.UserData128)
 	}
 
+	t.IdCuentaDebito = utils.Uint128AStringDecimal(transferenciaTB.DebitAccountID)
+	t.IdCuentaCredito = utils.Uint128AStringDecimal(transferenciaTB.CreditAccountID)
 	t.IdMoneda = transferenciaTB.Ledger
 	t.Monto = utils.Uint128AStringDecimal(transferenciaTB.Amount)
 	t.Categoria = transferenciaTB.UserData64
@@ -107,4 +112,35 @@ func (t *Transferencias) Dame() error {
 	}
 
 	return nil
+}
+
+// PoblarDesdeTB llena el struct con los datos directamente disponibles en el Transfer de TB,
+// sin realizar consultas adicionales a cuentas ni monedas.
+// Tipo queda vacío para transfers normales (requiere lookup de cuenta empresa para derivarlo).
+// IdUsuarioFinal se lee de UserData128 (solo disponible en transfers creadas tras el cambio que lo almacena ahí).
+func (t *Transferencias) PoblarDesdeTB(tb types.Transfer) {
+	t.IdTransferencia = utils.Uint128AStringDecimal(tb.ID)
+	t.IdCuentaDebito = utils.Uint128AStringDecimal(tb.DebitAccountID)
+	t.IdCuentaCredito = utils.Uint128AStringDecimal(tb.CreditAccountID)
+	t.IdMoneda = tb.Ledger
+	t.Monto = utils.Uint128AStringDecimal(tb.Amount)
+	t.Categoria = tb.UserData64
+
+	if tb.Code == CodigoTransferenciaReversion {
+		t.Estado = "R"
+		t.Tipo = "R"
+		t.IdTransferenciaOriginal = utils.Uint128AStringDecimal(tb.UserData128)
+	} else {
+		t.Estado = "F"
+		t.IdUsuarioFinal = binary.LittleEndian.Uint64(tb.UserData128[:8])
+	}
+
+	if tb.UserData32 > 0 {
+		if fecha, err := utils.UserData32AFecha(tb.UserData32); err == nil {
+			t.Fecha = fecha
+		}
+	}
+	if tb.Timestamp != 0 {
+		t.FechaProceso = utils.TimestampAFecha(tb.Timestamp)
+	}
 }
