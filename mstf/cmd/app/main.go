@@ -124,7 +124,7 @@ func inicializarCuentasEmpresa() error {
 		// Si la cuenta empresa no llegó a crearse en TB, crearla ahora
 		if !existe[tbId] {
 			log.Printf("Creando cuenta empresa faltante para moneda pendiente %d...", mi.idMoneda)
-			_, err := gc.Crear(uint32(mi.idMoneda), 0, mi.fechaAlta, false)
+			_, _, err := gc.Crear(uint32(mi.idMoneda), 0, mi.fechaAlta, false)
 			if err != nil {
 				log.Printf("ERROR [inicializarCuentasEmpresa]: No se pudo crear cuenta empresa para moneda pendiente %d: %v", mi.idMoneda, err)
 				return err

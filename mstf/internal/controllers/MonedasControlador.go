@@ -6,7 +6,6 @@ import (
 	"MSTransaccionesFinancieras/internal/utils"
 	"log"
 	"net/http"
-	"strings"
 	"time"
 
 	"github.com/labstack/echo/v4"
@@ -89,8 +88,8 @@ func (mc *MonedasControlador) Crear(c echo.Context) error {
 	}
 
 	// intenta crear la cuenta empresa en TB, si falla, borra la moneda creada
-	mensaje, err = mc.GestorCuentas.Crear(uint32(req.IdMoneda), uint64(0), time.Now().Format("2006-01-02"), false)
-	if err != nil && !strings.Contains(err.Error(), "AccountExists") {
+	mensaje, _, err = mc.GestorCuentas.Crear(uint32(req.IdMoneda), uint64(0), time.Now().Format("2006-01-02"), false)
+	if err != nil {
 		msjBorrar, errBorrar := mc.Gestor.Borrar(tokenSesion, req.IdMoneda)
 		if errBorrar != nil {
 			log.Printf("Error en rollback de creación moneda después de fallo en creación de cuenta: %v", errBorrar)

@@ -158,18 +158,51 @@ func (cc *CuentasControlador) Crear(c echo.Context) error {
 	}
 
 	// cuentas creadas vía API siempre tienen DebitsMustNotExceedCredits = true
-	idCuentaTBString, err := cc.Gestor.Crear(req.IdMoneda, req.IdUsuarioFinal, req.Fecha, true)
-	log.Printf("\n\nCuentasControlador.Crear: Resultado de creación en GestorCuentas: mensaje='%s', error='%v'", idCuentaTBString, err)
+	idCuentaTBString, existe, err := cc.Gestor.Crear(req.IdMoneda, req.IdUsuarioFinal, req.Fecha, true)
+	log.Printf("\n\nCuentasControlador.Crear: Resultado de creación en GestorCuentas: mensaje='%s', existe=%v, error='%v'", idCuentaTBString, existe, err)
 	if err != nil {
 		return c.JSON(http.StatusConflict, models.NewErrorRespuesta("Error al crear cuenta: "+err.Error()))
 	}
 
+	if existe {
+		return c.JSON(http.StatusOK, map[string]interface{}{
+			"Mensaje": "Cuenta ya existente",
+		})
+	}
 	return c.JSON(http.StatusCreated, map[string]interface{}{
 		"Mensaje": "Cuenta creada exitosamente",
 	})
 }
 
 func (cc *CuentasControlador) Buscar(c echo.Context) error {
+	// IdsUsuarioFinal e IdsMoneda: arrays paralelos para lookup directo. Deben tener la misma cantidad.
+	idsUsuarioFinalStr := c.QueryParams()["IdsUsuarioFinal"]
+	idsMonedaStr := c.QueryParams()["IdsMoneda"]
+
+	var idsCuenta []types.Uint128
+	if len(idsUsuarioFinalStr) > 0 || len(idsMonedaStr) > 0 {
+		if len(idsUsuarioFinalStr) != len(idsMonedaStr) {
+			return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta("IdsUsuarioFinal e IdsMoneda deben tener la misma cantidad de elementos"))
+		}
+		idsCuenta = make([]types.Uint128, 0, len(idsUsuarioFinalStr))
+		for i := range idsUsuarioFinalStr {
+			usuarioFinal, err := strconv.ParseUint(idsUsuarioFinalStr[i], 10, 64)
+			if err != nil {
+				return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta("IdsUsuarioFinal contiene un valor inválido: "+idsUsuarioFinalStr[i]))
+			}
+			moneda, err := strconv.ParseUint(idsMonedaStr[i], 10, 32)
+			if err != nil {
+				return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta("IdsMoneda contiene un valor inválido: "+idsMonedaStr[i]))
+			}
+			idCuentaStr := utils.ConcatenarIDString(uint64(moneda), usuarioFinal)
+			idCuenta, err := utils.ParsearUint128(idCuentaStr)
+			if err != nil {
+				return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta("No se pudo construir el ID de cuenta para el par en índice "+strconv.Itoa(i)))
+			}
+			idsCuenta = append(idsCuenta, idCuenta)
+		}
+	}
+
 	idUsuarioFinalStr := c.QueryParam("IdUsuarioFinal")
 	idMonedaStr := c.QueryParam("IdMoneda")
 	estado := c.QueryParam("Estado")
@@ -214,7 +247,7 @@ func (cc *CuentasControlador) Buscar(c echo.Context) error {
 		limit = uint32(parsed)
 	}
 
-	cuentas, err := cc.Gestor.Buscar(idUsuarioFinal, idMoneda, estado, limit)
+	cuentas, err := cc.Gestor.Buscar(idsCuenta, idUsuarioFinal, idMoneda, estado, limit)
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, models.NewErrorRespuesta("Error al buscar cuentas: "+err.Error()))
 	}

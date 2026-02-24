@@ -26,10 +26,12 @@ func NewGestorCuentas() *GestorCuentas {
 }
 
 // Buscar cuentas según los filtros especificados.
+// Si idsCuenta tiene elementos, hace LookupAccounts directo e ignora el resto de filtros.
 // Parámetros con valor 0 desactivan ese filtro en TigerBeetle.
 // estado: "A" para activas, "I" para inactivas/cerradas, "" para todas.
 // limit: máximo número de cuentas a retornar (0 = sin límite).
 func (gc *GestorCuentas) Buscar(
+	idsCuenta []types.Uint128,
 	idUsuarioFinal uint64,
 	idMoneda uint32,
 	estado string,
@@ -38,6 +40,11 @@ func (gc *GestorCuentas) Buscar(
 
 	if persistence.ClienteTB == nil {
 		return nil, errors.New("Conexión a TigerBeetle no inicializada")
+	}
+
+	// Camino A: lookup directo por IDs (ignora el resto de parámetros)
+	if len(idsCuenta) > 0 {
+		return persistence.ClienteTB.LookupAccounts(idsCuenta)
 	}
 
 	resultados := make([]types.Account, 0)
@@ -117,37 +124,39 @@ func (gc *GestorCuentas) Buscar(
 	return resultados, nil
 }
 
-// TODO: agregar comentario de método de clase
-func (gc *GestorCuentas) Crear(idMoneda uint32, idUsuarioFinal uint64, fechaAlta string, debitosNoDebenExcederCreditos bool) (string, error) {
+// Crear intenta crear una cuenta en TigerBeetle.
+// Retorna (idCuenta, existe, error).
+// existe=true indica que la cuenta ya existía con los mismos parámetros (idempotencia ante reintentos).
+func (gc *GestorCuentas) Crear(idMoneda uint32, idUsuarioFinal uint64, fechaAlta string, debitosNoDebenExcederCreditos bool) (string, bool, error) {
 	if persistence.ClienteTB == nil {
-		return "", errors.New("Conexión a TigerBeetle no inicializada")
+		return "", false, errors.New("Conexión a TigerBeetle no inicializada")
 	}
 
 	// Verificar que la moneda exista y esté activa
 	// TODO: el token está hardcodeado, reemplazar cuando se resuelva cómo obtenerlo en esta capa
 	moneda := &models.Monedas{IdMoneda: int(idMoneda)}
 	if _, err := moneda.Dame("cf904666e02a79cfd50b074ab3c360c0"); err != nil {
-		return "", errors.New("La moneda no existe o no está activa")
+		return "", false, errors.New("La moneda no existe o no está activa")
 	}
 	// Chequeo que se hace solo si la cuenta no es cuentaempresa
 	if debitosNoDebenExcederCreditos && moneda.Estado != "A" {
-		return "", errors.New("La moneda no existe o no está activa")
+		return "", false, errors.New("La moneda no existe o no está activa")
 	}
 
 	// idMoneda son los 64 bits mas significativos y idUsuarioFinal los menos significativos
 	idCuenta := utils.ConcatenarIDString(uint64(idMoneda), idUsuarioFinal)
 	if idCuenta == "" || idCuenta == "0" {
-		return "", errors.New("IdCuenta no puede ser vacío o cero")
+		return "", false, errors.New("IdCuenta no puede ser vacío o cero")
 	}
 
 	tbId, err := utils.ParsearUint128(idCuenta)
 	if err != nil {
-		return "", errors.New("IdCuenta formato incorrecto")
+		return "", false, errors.New("IdCuenta formato incorrecto")
 	}
 
 	fechaAltaUint32, err := utils.FechaAUserData32(fechaAlta)
 	if err != nil {
-		return "", errors.New("Formato de Fecha inválido: " + err.Error())
+		return "", false, errors.New("Formato de Fecha inválido: " + err.Error())
 	}
 
 	cuentaTB := types.Account{
@@ -164,12 +173,16 @@ func (gc *GestorCuentas) Crear(idMoneda uint32, idUsuarioFinal uint64, fechaAlta
 
 	results, err := persistence.ClienteTB.CreateAccounts([]types.Account{cuentaTB})
 	if err != nil {
-		return "", errors.New("error de comunicación con TigerBeetle")
+		return "", false, errors.New("error de comunicación con TigerBeetle")
 	}
 	if len(results) > 0 {
-		return "", errors.New("fallo en la creación de la cuenta: " + results[0].Result.String())
+		// AccountExists significa que ya existe con los mismos parámetros: idempotencia ante reintentos
+		if results[0].Result == types.AccountExists {
+			return idCuenta, true, nil
+		}
+		return "", false, errors.New("fallo en la creación de la cuenta: " + results[0].Result.String())
 	}
-	return idCuenta, nil
+	return idCuenta, false, nil
 }
 
 // Crea múltiples cuentas en TigerBeetle en un solo llamado.
@@ -233,13 +246,19 @@ func (gc *GestorCuentas) CrearLote(cuentas []CuentaNueva) ([]string, error) {
 	if err != nil {
 		return nil, errors.New("error de comunicación con TigerBeetle")
 	}
-	if len(results) > 0 {
-		for _, r := range results {
-			if int(r.Index) < len(ids) {
-				log.Printf("ERROR [GestorCuentas.CrearLote]: Cuenta %s falló: %s", ids[r.Index], r.Result.String())
-			}
+	fallosReales := 0
+	for _, r := range results {
+		// AccountExists significa que ya existe con los mismos parámetros: idempotencia ante reintentos
+		if r.Result == types.AccountExists {
+			continue
 		}
-		return nil, fmt.Errorf("fallo en la creación de %d de %d cuentas", len(results), len(cuentas))
+		fallosReales++
+		if int(r.Index) < len(ids) {
+			log.Printf("ERROR [GestorCuentas.CrearLote]: Cuenta %s falló: %s", ids[r.Index], r.Result.String())
+		}
+	}
+	if fallosReales > 0 {
+		return nil, fmt.Errorf("fallo en la creación de %d de %d cuentas", fallosReales, len(cuentas))
 	}
 
 	return ids, nil
