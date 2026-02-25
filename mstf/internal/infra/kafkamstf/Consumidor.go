@@ -209,9 +209,8 @@ func (c *Consumidor) parseKafkaMessage(msg kafka.Message) (types.Transfer, model
 	}
 
 	// Obtener IdCuentaEmpresa de la moneda
-	// TODO: eliminar hardcodeo de token
 	moneda := &models.Monedas{IdMoneda: int(kafkaMsg.IdMoneda)}
-	if _, err := moneda.Dame("cf904666e02a79cfd50b074ab3c360c0"); err != nil {
+	if _, err := moneda.Dame(); err != nil {
 		return types.Transfer{}, kafkaMsg, errors.New("La moneda no existe o no se encuentra activa")
 	}
 	if moneda.IdCuentaEmpresa == "" {

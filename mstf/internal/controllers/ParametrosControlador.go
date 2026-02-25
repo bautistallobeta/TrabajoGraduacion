@@ -1,6 +1,7 @@
 package controllers
 
 import (
+	httpMiddleware "MSTransaccionesFinancieras/internal/http/middlewares"
 	"MSTransaccionesFinancieras/internal/models"
 	"net/http"
 
@@ -18,7 +19,6 @@ func (pc *ParametrosControlador) Dame(c echo.Context) error {
 	type Request struct {
 		Parametro string `param:"Parametro"`
 	}
-	tokenSesion, _ := c.Get("adminToken").(string)
 	req := &Request{}
 	if err := c.Bind(req); err != nil {
 		return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta("Parámetros inválidos: "+err.Error()))
@@ -27,7 +27,7 @@ func (pc *ParametrosControlador) Dame(c echo.Context) error {
 		return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta("Parámetro es campo obligatorio"))
 	}
 	param := &models.Parametros{Parametro: req.Parametro}
-	mensaje, err := param.Dame(tokenSesion)
+	mensaje, err := param.Dame()
 	if mensaje != "OK" {
 		return c.JSON(http.StatusNotFound, models.NewErrorRespuesta(mensaje))
 	}
@@ -43,7 +43,8 @@ func (pc *ParametrosControlador) Modificar(c echo.Context) error {
 		Parametro string `param:"Parametro"`
 		Valor     string `json:"Valor"`
 	}
-	tokenSesion, _ := c.Get("adminToken").(string)
+	credencial, _ := c.Get(httpMiddleware.ClaveCredencial).(string)
+	actor, _ := c.Get(httpMiddleware.ClaveActor).(string)
 	req := &Request{}
 	if err := c.Bind(req); err != nil {
 		return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta("Parámetros inválidos: "+err.Error()))
@@ -55,7 +56,7 @@ func (pc *ParametrosControlador) Modificar(c echo.Context) error {
 		return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta("Valor es campo obligatorio"))
 	}
 	param := &models.Parametros{Parametro: req.Parametro}
-	mensaje, err := param.ModificarParametro(tokenSesion, req.Valor)
+	mensaje, err := param.ModificarParametro(credencial, actor, req.Valor)
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, models.NewErrorRespuesta("Error al modificar parámetro: "+err.Error()))
 	}
@@ -69,13 +70,12 @@ func (pc *ParametrosControlador) Buscar(c echo.Context) error {
 	type Request struct {
 		Cadena string `query:"Cadena"`
 	}
-	tokenSesion, _ := c.Get("adminToken").(string)
 	req := &Request{}
 	if err := c.Bind(req); err != nil {
 		return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta("Parámetros inválidos: "+err.Error()))
 	}
 	param := &models.Parametros{}
-	parametros, err := param.BuscarParametros(tokenSesion, req.Cadena)
+	parametros, err := param.BuscarParametros(req.Cadena)
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, models.NewErrorRespuesta("Error al buscar parámetros: "+err.Error()))
 	}

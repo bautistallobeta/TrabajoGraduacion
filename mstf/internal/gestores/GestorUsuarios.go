@@ -18,13 +18,11 @@ func NewGestorUsuarios() *GestorUsuarios {
 // Al iniciar sesión por primera vez, deberá cambiar su contraseña y se activará.
 // Devuelve OK + Id + PasswordTemporal o el mensaje de error.
 // tsp_crear_usuario
-// - tokenSesion: token de sesión del usuario que realiza la operación
-// - usuario: nombre de usuario a crear
-func (gu *GestorUsuarios) Crear(tokenSesion string, usuario string) (string, int, string, error) {
+func (gu *GestorUsuarios) Crear(usuario string) (string, int, string, error) {
 	var mensaje string
 	var id sql.NullInt64
 	var passwordTemporal sql.NullString
-	err := persistence.ClienteMySQL.QueryRow("CALL tsp_crear_usuario(?, ?)", tokenSesion, usuario).Scan(&mensaje, &id, &passwordTemporal)
+	err := persistence.ClienteMySQL.QueryRow("CALL tsp_crear_usuario(?)", usuario).Scan(&mensaje, &id, &passwordTemporal)
 
 	if err != nil {
 		return "", 0, "", err
@@ -37,15 +35,12 @@ func (gu *GestorUsuarios) Crear(tokenSesion string, usuario string) (string, int
 	return mensaje, int(id.Int64), passwordTemporal.String, nil
 }
 
-// Permite listar todos los usuarios que cumplan con la condición de búsqueda: la cadena debe estar
-// contenida en el nombre de usuario. Puede o no incluir los usuarios dados de baja
-// según pIncluyeBajas (S: Si - N: No). Ordena por nombre de usuario.
+// Permite listar todos los usuarios que cumplan con la condición de búsqueda.
 // tsp_buscar_usuarios
-// - tokenSesion: token de sesión del usuario que realiza la operación
 // - cadena: cadena de búsqueda para filtrar por nombre de usuario
 // - incluyeBajas: S para incluir usuarios dados de baja, N para excluirlos
-func (gu *GestorUsuarios) Buscar(tokenSesion string, cadena string, incluyeBajas string) ([]*models.Usuarios, error) {
-	rows, err := persistence.ClienteMySQL.Query("CALL tsp_buscar_usuarios(?, ?, ?)", tokenSesion, cadena, incluyeBajas)
+func (gu *GestorUsuarios) Buscar(cadena string, incluyeBajas string) ([]*models.Usuarios, error) {
+	rows, err := persistence.ClienteMySQL.Query("CALL tsp_buscar_usuarios(?, ?)", cadena, incluyeBajas)
 	if err != nil {
 		return nil, err
 	}
@@ -65,32 +60,25 @@ func (gu *GestorUsuarios) Buscar(tokenSesion string, cadena string, incluyeBajas
 }
 
 // Permite eliminar un usuario siempre y cuando no tenga registros en aud_Operaciones.
-// No puede eliminarse a sí mismo.
-// Devuelve OK o el mensaje de error
 // tsp_borrar_usuario
-// - tokenSesion: token de sesión del usuario que realiza la operación
-// - idUsuario: Id del usuario a eliminar
-func (gu *GestorUsuarios) Borrar(tokenSesion string, idUsuario int) (string, error) {
+func (gu *GestorUsuarios) Borrar(idUsuario int) (string, error) {
 	var mensaje string
-	err := persistence.ClienteMySQL.QueryRow("CALL tsp_borrar_usuario(?, ?)", tokenSesion, idUsuario).Scan(&mensaje)
+	err := persistence.ClienteMySQL.QueryRow("CALL tsp_borrar_usuario(?)", idUsuario).Scan(&mensaje)
 	if err != nil {
 		return "", err
 	}
 	return mensaje, nil
 }
 
-// Permite al usuario modificar su contraseña. Debe ingresar la contraseña anterior (hasheada con md5),
-// la nueva y su confirmación. La política de contraseñas establece que ésta debe tener una longitud
-// mínima de 6 caracteres y debe incluir por lo menos una letra y un número.
-// Devuelve OK o el mensaje de error
+// Permite al usuario modificar su contraseña.
 // tsp_modificar_password_usuario
-// - tokenSesion: token de sesión del usuario que realiza la operación
+// - credencial: token de sesión del usuario (para identificarlo en el SP)
 // - passwordAnterior: contraseña actual hasheada con md5
 // - passwordNuevo: nueva contraseña hasheada con md5
 // - confirmarPassword: confirmación de la nueva contraseña hasheada con md5
-func (gu *GestorUsuarios) ModificarPassword(tokenSesion string, passwordAnterior string, passwordNuevo string, confirmarPassword string) (string, error) {
+func (gu *GestorUsuarios) ModificarPassword(credencial string, passwordAnterior string, passwordNuevo string, confirmarPassword string) (string, error) {
 	var mensaje string
-	err := persistence.ClienteMySQL.QueryRow("CALL tsp_modificar_password_usuario(?, ?, ?, ?)", tokenSesion, passwordAnterior, passwordNuevo, confirmarPassword).Scan(&mensaje)
+	err := persistence.ClienteMySQL.QueryRow("CALL tsp_modificar_password_usuario(?, ?, ?, ?)", credencial, passwordAnterior, passwordNuevo, confirmarPassword).Scan(&mensaje)
 	if err != nil {
 		return "", err
 	}
@@ -98,15 +86,11 @@ func (gu *GestorUsuarios) ModificarPassword(tokenSesion string, passwordAnterior
 }
 
 // Permite a un administrador logueado restablecer la contraseña de otro usuario.
-// Genera una contraseña temporal, deja al usuario en estado Pendiente y regenera su token.
-// Devuelve OK + PasswordTemporal o el mensaje de error.
 // tsp_restablecer_password_usuario
-// - tokenSesion: token de sesión del usuario que realiza la operación
-// - idUsuario: Id del usuario al que se le restablecerá la contraseña
-func (gu *GestorUsuarios) RestablecerPassword(tokenSesion string, idUsuario int) (string, string, error) {
+func (gu *GestorUsuarios) RestablecerPassword(idUsuario int) (string, string, error) {
 	var mensaje string
 	var passwordTemporal sql.NullString
-	err := persistence.ClienteMySQL.QueryRow("CALL tsp_restablecer_password_usuario(?, ?)", tokenSesion, idUsuario).Scan(&mensaje, &passwordTemporal)
+	err := persistence.ClienteMySQL.QueryRow("CALL tsp_restablecer_password_usuario(?)", idUsuario).Scan(&mensaje, &passwordTemporal)
 	if err != nil {
 		return "", "", err
 	}

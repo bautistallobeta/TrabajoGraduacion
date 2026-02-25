@@ -134,9 +134,8 @@ func (gc *GestorCuentas) Crear(idMoneda uint32, idUsuarioFinal uint64, fechaAlta
 	}
 
 	// Verificar que la moneda exista y esté activa
-	// TODO: el token está hardcodeado, reemplazar cuando se resuelva cómo obtenerlo en esta capa
 	moneda := &models.Monedas{IdMoneda: int(idMoneda)}
-	if _, err := moneda.Dame("cf904666e02a79cfd50b074ab3c360c0"); err != nil {
+	if _, err := moneda.Dame(); err != nil {
 		return "", false, errors.New("La moneda no existe o no está activa")
 	}
 	// Chequeo que se hace solo si la cuenta no es cuentaempresa
@@ -197,10 +196,9 @@ func (gc *GestorCuentas) CrearLote(cuentas []CuentaNueva) ([]string, error) {
 	}
 
 	// Verificar que la moneda de cada cuenta exista y esté activa
-	// TODO: el token está hardcodeado, reemplazar cuando se resuelva cómo obtenerlo en esta capa
 	for _, c := range cuentas {
 		moneda := &models.Monedas{IdMoneda: int(c.IdMoneda)}
-		if _, err := moneda.Dame("cf904666e02a79cfd50b074ab3c360c0"); err != nil {
+		if _, err := moneda.Dame(); err != nil {
 			return nil, fmt.Errorf("La moneda no existe o no está activa (IdMoneda=%d)", c.IdMoneda)
 		}
 		if moneda.Estado != "A" {
@@ -273,9 +271,8 @@ func (gc *GestorCuentas) Desactivar(idMoneda uint32, idUsuarioFinal uint64) erro
 		return errors.New("Conexión a TigerBeetle no inicializada")
 	}
 
-	// TODO: el token está hardcodeado, reemplazar cuando se resuelva cómo obtenerlo en esta capa
 	moneda := &models.Monedas{IdMoneda: int(idMoneda)}
-	if _, err := moneda.Dame("cf904666e02a79cfd50b074ab3c360c0"); err != nil {
+	if _, err := moneda.Dame(); err != nil {
 		return errors.New("La moneda no existe o no está activa")
 	}
 	if moneda.Estado != "A" || moneda.IdCuentaEmpresa == "" {

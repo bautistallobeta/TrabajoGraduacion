@@ -2,6 +2,7 @@ package controllers
 
 import (
 	"MSTransaccionesFinancieras/internal/gestores"
+	httpMiddleware "MSTransaccionesFinancieras/internal/http/middlewares"
 	"MSTransaccionesFinancieras/internal/models"
 	"MSTransaccionesFinancieras/internal/utils"
 	"net/http"
@@ -21,7 +22,6 @@ func (uc *UsuariosControlador) Crear(c echo.Context) error {
 	type Request struct {
 		Usuario string `json:"Usuario"`
 	}
-	tokenSesion, _ := c.Get("adminToken").(string)
 	req := &Request{}
 
 	if err := c.Bind(req); err != nil {
@@ -30,7 +30,7 @@ func (uc *UsuariosControlador) Crear(c echo.Context) error {
 	if req.Usuario == "" {
 		return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta("Usuario es campo obligatorio"))
 	}
-	mensaje, id, passTemporal, err := uc.Gestor.Crear(tokenSesion, req.Usuario)
+	mensaje, id, passTemporal, err := uc.Gestor.Crear(req.Usuario)
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, models.NewErrorRespuesta("Error al crear usuario: "+err.Error()))
 	}
@@ -45,7 +45,6 @@ func (uc *UsuariosControlador) Buscar(c echo.Context) error {
 		Cadena       string `query:"cadena"`
 		IncluyeBajas string `query:"incluyeBajas"`
 	}
-	tokenSesion, _ := c.Get("adminToken").(string)
 	req := &Request{}
 	if err := c.Bind(req); err != nil {
 		return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta("Parámetros inválidos: "+err.Error()))
@@ -55,7 +54,7 @@ func (uc *UsuariosControlador) Buscar(c echo.Context) error {
 	} else if req.IncluyeBajas != "S" && req.IncluyeBajas != "N" {
 		return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta("IncluyeBajas debe ser 'S' o 'N'"))
 	}
-	usuarios, err := uc.Gestor.Buscar(tokenSesion, req.Cadena, req.IncluyeBajas)
+	usuarios, err := uc.Gestor.Buscar(req.Cadena, req.IncluyeBajas)
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, models.NewErrorRespuesta("Error al buscar usuarios: "+err.Error()))
 	}
@@ -66,12 +65,11 @@ func (uc *UsuariosControlador) Borrar(c echo.Context) error {
 	type Request struct {
 		IdUsuario int `param:"IdUsuario"`
 	}
-	tokenSesion, _ := c.Get("adminToken").(string)
 	req := &Request{}
 	if err := c.Bind(req); err != nil {
 		return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta("Parámetros inválidos: "+err.Error()))
 	}
-	mensaje, err := uc.Gestor.Borrar(tokenSesion, req.IdUsuario)
+	mensaje, err := uc.Gestor.Borrar(req.IdUsuario)
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, models.NewErrorRespuesta("Error al borrar usuario: "+err.Error()))
 	}
@@ -87,7 +85,7 @@ func (uc *UsuariosControlador) ModificarPassword(c echo.Context) error {
 		PasswordNuevo     string `json:"PasswordNuevo"`
 		ConfirmarPassword string `json:"ConfirmarPassword"`
 	}
-	tokenSesion, _ := c.Get("adminToken").(string)
+	credencial, _ := c.Get(httpMiddleware.ClaveCredencial).(string)
 	req := &Request{}
 	if err := c.Bind(req); err != nil {
 		return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta("Parámetros inválidos: "+err.Error()))
@@ -98,7 +96,7 @@ func (uc *UsuariosControlador) ModificarPassword(c echo.Context) error {
 	if req.PasswordNuevo != req.ConfirmarPassword {
 		return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta("La confirmación de la nueva contraseña no coincide"))
 	}
-	mensaje, err := uc.Gestor.ModificarPassword(tokenSesion, utils.MD5Hash(req.PasswordAnterior), utils.MD5Hash(req.PasswordNuevo), utils.MD5Hash(req.ConfirmarPassword))
+	mensaje, err := uc.Gestor.ModificarPassword(credencial, utils.MD5Hash(req.PasswordAnterior), utils.MD5Hash(req.PasswordNuevo), utils.MD5Hash(req.ConfirmarPassword))
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, models.NewErrorRespuesta("Error al modificar contraseña: "+err.Error()))
 	}
@@ -112,7 +110,6 @@ func (uc *UsuariosControlador) ReestablecerPassword(c echo.Context) error {
 	type Request struct {
 		IdUsuario int `json:"IdUsuario"`
 	}
-	tokenSesion, _ := c.Get("adminToken").(string)
 	req := &Request{}
 	if err := c.Bind(req); err != nil {
 		return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta("Parámetros inválidos: "+err.Error()))
@@ -120,7 +117,7 @@ func (uc *UsuariosControlador) ReestablecerPassword(c echo.Context) error {
 	if req.IdUsuario <= 0 {
 		return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta("IdUsuario es campo obligatorio"))
 	}
-	mensaje, passTemporal, err := uc.Gestor.RestablecerPassword(tokenSesion, req.IdUsuario)
+	mensaje, passTemporal, err := uc.Gestor.RestablecerPassword(req.IdUsuario)
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, models.NewErrorRespuesta("Error al restablecer contraseña: "+err.Error()))
 	}
@@ -134,7 +131,6 @@ func (uc *UsuariosControlador) Dame(c echo.Context) error {
 	type Request struct {
 		IdUsuario int `param:"IdUsuario"`
 	}
-	tokenSesion, _ := c.Get("adminToken").(string)
 	req := &Request{}
 	if err := c.Bind(req); err != nil {
 		return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta("Parámetros inválidos: "+err.Error()))
@@ -143,7 +139,7 @@ func (uc *UsuariosControlador) Dame(c echo.Context) error {
 		return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta("IdUsuario es campo obligatorio"))
 	}
 	usuario := &models.Usuarios{IdUsuario: req.IdUsuario}
-	mensaje, err := usuario.Dame(tokenSesion)
+	mensaje, err := usuario.Dame()
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, models.NewErrorRespuesta("Error al obtener usuario: "+err.Error()))
 	}
@@ -180,7 +176,6 @@ func (uc *UsuariosControlador) Activar(c echo.Context) error {
 	type Request struct {
 		IdUsuario int `param:"IdUsuario"`
 	}
-	tokenSesion, _ := c.Get("adminToken").(string)
 	req := &Request{}
 	if err := c.Bind(req); err != nil {
 		return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta("Parámetros inválidos: "+err.Error()))
@@ -189,7 +184,7 @@ func (uc *UsuariosControlador) Activar(c echo.Context) error {
 		return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta("IdUsuario es campo obligatorio"))
 	}
 	usuario := &models.Usuarios{IdUsuario: req.IdUsuario}
-	mensaje, err := usuario.Activar(tokenSesion)
+	mensaje, err := usuario.Activar()
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, models.NewErrorRespuesta("Error al activar usuario: "+err.Error()))
 	}
@@ -203,7 +198,6 @@ func (uc *UsuariosControlador) Desactivar(c echo.Context) error {
 	type Request struct {
 		IdUsuario int `param:"IdUsuario"`
 	}
-	tokenSesion, _ := c.Get("adminToken").(string)
 	req := &Request{}
 	if err := c.Bind(req); err != nil {
 		return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta("Parámetros inválidos: "+err.Error()))
@@ -212,7 +206,7 @@ func (uc *UsuariosControlador) Desactivar(c echo.Context) error {
 		return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta("IdUsuario es campo obligatorio"))
 	}
 	usuario := &models.Usuarios{IdUsuario: req.IdUsuario}
-	mensaje, err := usuario.Desactivar(tokenSesion)
+	mensaje, err := usuario.Desactivar()
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, models.NewErrorRespuesta("Error al desactivar usuario: "+err.Error()))
 	}
@@ -228,7 +222,7 @@ func (uc *UsuariosControlador) ConfirmarUsuario(c echo.Context) error {
 		Password          string `json:"Password"`
 		ConfirmarPassword string `json:"ConfirmarPassword"`
 	}
-	tokenSesion, _ := c.Get("adminToken").(string)
+	credencial, _ := c.Get(httpMiddleware.ClaveCredencial).(string)
 	req := &Request{}
 	if err := c.Bind(req); err != nil {
 		return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta("Parámetros inválidos: "+err.Error()))
@@ -240,7 +234,7 @@ func (uc *UsuariosControlador) ConfirmarUsuario(c echo.Context) error {
 		return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta("Password y ConfirmarPassword son campos obligatorios"))
 	}
 	usuario := &models.Usuarios{IdUsuario: req.IdUsuario}
-	mensaje, err := usuario.ConfirmarCuenta(tokenSesion, utils.MD5Hash(req.Password), utils.MD5Hash(req.ConfirmarPassword))
+	mensaje, err := usuario.ConfirmarCuenta(credencial, utils.MD5Hash(req.Password), utils.MD5Hash(req.ConfirmarPassword))
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, models.NewErrorRespuesta("Error al confirmar cuenta del usuario: "+err.Error()))
 	}

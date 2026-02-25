@@ -19,15 +19,14 @@ var CacheMonedas = cache.NewCache[Monedas](30 * time.Minute)
 
 // Instancia los atributos de la moneda desde la base de datos.
 // tsp_dame_moneda
-// - tokenSesion: token de sesión del usuario
-func (m *Monedas) Dame(tokenSesion string) (string, error) {
+func (m *Monedas) Dame() (string, error) {
 	clave := strconv.Itoa(m.IdMoneda)
 	if cached, ok := CacheMonedas.Dame(clave); ok {
 		*m = cached
 		return "OK", nil
 	}
 
-	rows, err := persistence.ClienteMySQL.Query("CALL tsp_dame_moneda(?, ?)", tokenSesion, m.IdMoneda)
+	rows, err := persistence.ClienteMySQL.Query("CALL tsp_dame_moneda(?)", m.IdMoneda)
 	if err != nil {
 		return "", err
 	}
@@ -73,10 +72,11 @@ func (m *Monedas) Dame(tokenSesion string) (string, error) {
 
 // Activa una moneda pendiente asignando la cuenta empresa.
 // tsp_activar_moneda
-// - tokenSesion: token de sesión del usuario
-func (m *Monedas) Activar(tokenSesion string) (string, error) {
+// - credencial: credencial del actor que realiza la operación
+// - actor: tipo de actor ('SISTEMA' o 'USUARIO')
+func (m *Monedas) Activar(credencial string, actor string) (string, error) {
 	var mensaje string
-	err := persistence.ClienteMySQL.QueryRow("CALL tsp_activar_moneda(?, ?)", tokenSesion, m.IdMoneda).Scan(&mensaje)
+	err := persistence.ClienteMySQL.QueryRow("CALL tsp_activar_moneda(?, ?, ?)", credencial, actor, m.IdMoneda).Scan(&mensaje)
 	if err != nil {
 		return "", err
 	}
@@ -86,10 +86,11 @@ func (m *Monedas) Activar(tokenSesion string) (string, error) {
 
 // Desactiva una moneda activa.
 // tsp_desactivar_moneda
-// - tokenSesion: token de sesión del usuario
-func (m *Monedas) Desactivar(tokenSesion string) (string, error) {
+// - credencial: credencial del actor que realiza la operación
+// - actor: tipo de actor ('SISTEMA' o 'USUARIO')
+func (m *Monedas) Desactivar(credencial string, actor string) (string, error) {
 	var mensaje string
-	err := persistence.ClienteMySQL.QueryRow("CALL tsp_desactivar_moneda(?, ?)", tokenSesion, m.IdMoneda).Scan(&mensaje)
+	err := persistence.ClienteMySQL.QueryRow("CALL tsp_desactivar_moneda(?, ?, ?)", credencial, actor, m.IdMoneda).Scan(&mensaje)
 	if err != nil {
 		return "", err
 	}

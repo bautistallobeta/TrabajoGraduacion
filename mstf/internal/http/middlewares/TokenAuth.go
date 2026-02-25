@@ -6,14 +6,19 @@ import (
 	"strings"
 
 	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v4/middleware"
 )
 
 const ClaveActor = "Actor"
 const ClaveCredencial = "Credencial"
 
-func AutenticacionDual() echo.MiddlewareFunc {
+func AutenticacionDual(skipper middleware.Skipper) echo.MiddlewareFunc {
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c echo.Context) error {
+			if skipper(c) {
+				return next(c)
+			}
+
 			apiKey := c.Request().Header.Get("X-API-Key")
 			authHeader := c.Request().Header.Get("Authorization")
 
@@ -31,9 +36,10 @@ func AutenticacionDual() echo.MiddlewareFunc {
 				)
 			}
 
+			var credencial, actor string
 			if apiKey != "" {
-				c.Set(ClaveActor, "SISTEMA")
-				c.Set(ClaveCredencial, apiKey)
+				actor = "SISTEMA"
+				credencial = apiKey
 			} else {
 				partes := strings.SplitN(authHeader, " ", 2)
 				if len(partes) != 2 || strings.ToLower(partes[0]) != "bearer" || partes[1] == "" {
@@ -42,9 +48,16 @@ func AutenticacionDual() echo.MiddlewareFunc {
 						models.NewErrorRespuesta("No Autorizado"),
 					)
 				}
-				c.Set(ClaveActor, "USUARIO")
-				c.Set(ClaveCredencial, partes[1])
+				actor = "USUARIO"
+				credencial = partes[1]
 			}
+
+			if err := models.Autenticar(credencial, actor); err != nil {
+				return c.JSON(http.StatusUnauthorized, models.NewErrorRespuesta(err.Error()))
+			}
+
+			c.Set(ClaveActor, actor)
+			c.Set(ClaveCredencial, credencial)
 
 			return next(c)
 		}

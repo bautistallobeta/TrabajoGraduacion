@@ -220,24 +220,21 @@ func (gt *GestorTransferencias) ProcesarLote(batch []types.Transfer, kafkaMsgs [
 // Retorna "" si la transferencia es válida, o un string con el código de error.
 func (gt *GestorTransferencias) validarTransferencia(t types.Transfer) string {
 	monto := binary.LittleEndian.Uint64(t.Amount[:8])
-	// TODO: eliminar hardcodeo de token
 	paramMax := &models.Parametros{Parametro: "MONTOMAXTRANSFER"}
-	if _, err := paramMax.Dame("cf904666e02a79cfd50b074ab3c360c0"); err == nil {
+	if _, err := paramMax.Dame(); err == nil {
 		if max, err := strconv.ParseUint(paramMax.Valor, 10, 64); err == nil && monto > max {
 			return "El monto excede el máximo permitido por transferencia"
 		}
 	}
-	// TODO: eliminar hardcodeo de token
 	paramMin := &models.Parametros{Parametro: "MONTOMINTRANSFER"}
-	if _, err := paramMin.Dame("cf904666e02a79cfd50b074ab3c360c0"); err == nil {
+	if _, err := paramMin.Dame(); err == nil {
 		if min, err := strconv.ParseUint(paramMin.Valor, 10, 64); err == nil && monto < min {
 			return "El monto es inferior al mínimo permitido por transferencia"
 		}
 	}
 
-	// TODO: eliminar hardcodeo de token
 	moneda := &models.Monedas{IdMoneda: int(t.Ledger)}
-	if _, err := moneda.Dame("cf904666e02a79cfd50b074ab3c360c0"); err != nil {
+	if _, err := moneda.Dame(); err != nil {
 		return "La moneda no existe o no está activa"
 	}
 	if moneda.Estado != "A" {

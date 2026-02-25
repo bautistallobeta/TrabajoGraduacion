@@ -30,7 +30,7 @@ func inicializarCuentasEmpresa() error {
 	const tokenAdmin = "cf904666e02a79cfd50b074ab3c360c0"
 
 	gm := gestores.NewGestorMonedas()
-	monedas, err := gm.Listar(tokenAdmin, "N")
+	monedas, err := gm.Listar("N")
 	if err != nil {
 		log.Printf("ERROR [inicializarCuentasEmpresa]: No se pudieron listar monedas: %v", err)
 		return err
@@ -134,7 +134,7 @@ func inicializarCuentasEmpresa() error {
 
 		// Activar la moneda (P -> A)
 		moneda := &models.Monedas{IdMoneda: mi.idMoneda}
-		mensaje, err := moneda.Activar(tokenAdmin)
+		mensaje, err := moneda.Activar(tokenAdmin, "SISTEMA")
 		if err != nil {
 			log.Printf("ERROR [inicializarCuentasEmpresa]: No se pudo activar moneda pendiente %d: %v", mi.idMoneda, err)
 			return err

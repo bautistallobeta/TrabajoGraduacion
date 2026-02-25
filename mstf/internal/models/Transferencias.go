@@ -80,9 +80,8 @@ func (t *Transferencias) Dame() error {
 	}
 
 	// Derivar Tipo e IdUsuarioFinal comparando DebitAccountID/CreditAccountID con la cuenta empresa
-	// TODO: eliminar hardcodeo de token
 	moneda := &Monedas{IdMoneda: int(transferenciaTB.Ledger)}
-	if _, err := moneda.Dame("cf904666e02a79cfd50b074ab3c360c0"); err == nil && moneda.IdCuentaEmpresa != "" {
+	if _, err := moneda.Dame(); err == nil && moneda.IdCuentaEmpresa != "" {
 		idCuentaEmpresa, errParse := utils.ParsearUint128(moneda.IdCuentaEmpresa)
 		if errParse == nil {
 			var idCuentaUsuario types.Uint128

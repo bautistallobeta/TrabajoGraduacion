@@ -20,7 +20,10 @@ func InitRouter(notificador *webhook.Notificador, productor *kafkamstf.Productor
 		middleware.Recover(),
 		middleware.Logger(),
 		middleware.CORS(),
-		httpMiddleware.AutenticacionDual(),
+		httpMiddleware.AutenticacionDual(func(c echo.Context) bool {
+			path := c.Request().URL.Path
+			return path == "/ping" || path == "/usuarios/login"
+		}),
 	)
 
 	initRoutes(e, notificador, productor)

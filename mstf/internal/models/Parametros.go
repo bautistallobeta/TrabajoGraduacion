@@ -18,15 +18,13 @@ var CacheParametros = cache.NewCache[Parametros](30 * time.Minute)
 
 // Devuelve los datos de un parámetro específico por su clave.
 // tsp_dame_parametro
-// - tokenSesion: token de sesión del usuario
-// - parametro: clave del parámetro a instanciar
-func (p *Parametros) Dame(tokenSesion string) (string, error) {
+func (p *Parametros) Dame() (string, error) {
 	if cached, ok := CacheParametros.Dame(p.Parametro); ok {
 		*p = cached
 		return "OK", nil
 	}
 
-	rows, err := persistence.ClienteMySQL.Query("CALL tsp_dame_parametro(?, ?)", tokenSesion, p.Parametro)
+	rows, err := persistence.ClienteMySQL.Query("CALL tsp_dame_parametro(?)", p.Parametro)
 	if err != nil {
 		return "", err
 	}
@@ -67,13 +65,10 @@ func (p *Parametros) Dame(tokenSesion string) (string, error) {
 	return mensaje, nil
 }
 
-//	Permite buscar los parámetros del sistema según su nombre. Si pSoloModificables es 'S', muestra solo los
-//	modificables desde el sitio administrativo. Ordena por nombre de parámetro.
-//
+// Permite buscar los parámetros del sistema según su nombre.
 // tsp_buscar_parametros
-// - tokenSesion: token de sesión del usuario
-func (p *Parametros) BuscarParametros(tokenSesion string, cadena string) ([]Parametros, error) {
-	rows, err := persistence.ClienteMySQL.Query("CALL tsp_buscar_parametros(?, ?)", tokenSesion, cadena)
+func (p *Parametros) BuscarParametros(cadena string) ([]Parametros, error) {
+	rows, err := persistence.ClienteMySQL.Query("CALL tsp_buscar_parametros(?, ?)", cadena, "N")
 	if err != nil {
 		return nil, err
 	}
@@ -92,13 +87,13 @@ func (p *Parametros) BuscarParametros(tokenSesion string, cadena string) ([]Para
 }
 
 // Permite modificar el valor de un parámetro siempre y cuando exista y sea modificable.
-// Devuelve OK o el mensaje de error en Mensaje.
 // tsp_modificar_parametro
-// - tokenSesion: token de sesión del usuario
+// - credencial: credencial del actor que realiza la operación (para auditoría)
+// - actor: tipo de actor ('SISTEMA' o 'USUARIO') (para auditoría)
 // - valor: nuevo valor del parámetro
-func (p *Parametros) ModificarParametro(tokenSesion string, valor string) (string, error) {
+func (p *Parametros) ModificarParametro(credencial string, actor string, valor string) (string, error) {
 	var mensaje string
-	err := persistence.ClienteMySQL.QueryRow("CALL tsp_modificar_parametro(?, ?, ?)", tokenSesion, p.Parametro, valor).Scan(&mensaje)
+	err := persistence.ClienteMySQL.QueryRow("CALL tsp_modificar_parametro(?, ?, ?, ?)", credencial, actor, p.Parametro, valor).Scan(&mensaje)
 	if err != nil {
 		return "", err
 	}

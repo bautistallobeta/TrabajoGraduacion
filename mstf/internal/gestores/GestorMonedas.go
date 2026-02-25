@@ -16,26 +16,24 @@ func NewGestorMonedas() *GestorMonedas {
 
 // Crea una moneda en estado P: Pendiente.
 // tsp_crear_moneda
-// - tokenSesion: token de sesión del usuario
+// - credencial: credencial del actor que realiza la operación
+// - actor: tipo de actor ('SISTEMA' o 'USUARIO')
 // - idMoneda: Id de la moneda a crear (viene de MisGastos)
 // - idCuentaEmpresa: Id de la cuenta empresa en TB asociada a esta moneda
-func (gm *GestorMonedas) Crear(tokenSesion string, idMoneda int, idCuentaEmpresa string) (string, error) {
+func (gm *GestorMonedas) Crear(credencial string, actor string, idMoneda int, idCuentaEmpresa string) (string, error) {
 	var mensaje string
-	err := persistence.ClienteMySQL.QueryRow("CALL tsp_crear_moneda(?, ?, ?)", tokenSesion, idMoneda, idCuentaEmpresa).Scan(&mensaje)
+	err := persistence.ClienteMySQL.QueryRow("CALL tsp_crear_moneda(?, ?, ?, ?)", credencial, actor, idMoneda, idCuentaEmpresa).Scan(&mensaje)
 	if err != nil {
 		return "", err
 	}
 	return mensaje, nil
 }
 
-//	Permite listar todas las monedas. Si pIncluyeInactivas es 'S', muestra todas.
-//
-// Si es 'N', muestra solo las activas. Ordena por IdMoneda.
+// Permite listar todas las monedas.
 // tsp_listar_monedas
-// - tokenSesion: token de sesión del usuario
 // - incluyeBajas: 'S' o 'N' para incluir o no las monedas bajas
-func (gm *GestorMonedas) Listar(tokenSesion string, incluyeBajas string) ([]models.Monedas, error) {
-	rows, err := persistence.ClienteMySQL.Query("CALL tsp_listar_monedas(?, ?)", tokenSesion, incluyeBajas)
+func (gm *GestorMonedas) Listar(incluyeBajas string) ([]models.Monedas, error) {
+	rows, err := persistence.ClienteMySQL.Query("CALL tsp_listar_monedas(?)", incluyeBajas)
 	if err != nil {
 		return nil, err
 	}
@@ -55,15 +53,16 @@ func (gm *GestorMonedas) Listar(tokenSesion string, incluyeBajas string) ([]mode
 
 // Borra una moneda únicamente si está en estado Inactivo.
 // tsp_borrar_moneda
-// - tokenSesion: token de sesión del usuario
+// - credencial: credencial del actor que realiza la operación
+// - actor: tipo de actor ('SISTEMA' o 'USUARIO')
 // - idMoneda: Id de la moneda a borrar
-func (gm *GestorMonedas) Borrar(tokenSesion string, idMoneda int) (string, error) {
+func (gm *GestorMonedas) Borrar(credencial string, actor string, idMoneda int) (string, error) {
 	// BORRAR TEST
 	if idMoneda == 901 {
 		return "", errors.New("error simulado: MySQL caido en rollback")
 	}
 	var mensaje string
-	err := persistence.ClienteMySQL.QueryRow("CALL tsp_borrar_moneda(?, ?)", tokenSesion, idMoneda).Scan(&mensaje)
+	err := persistence.ClienteMySQL.QueryRow("CALL tsp_borrar_moneda(?, ?, ?)", credencial, actor, idMoneda).Scan(&mensaje)
 	if err != nil {
 		return "", err
 	}
