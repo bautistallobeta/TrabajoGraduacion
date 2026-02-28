@@ -2,6 +2,7 @@ package models
 
 import (
 	"errors"
+	"strconv"
 
 	"MSTransaccionesFinancieras/internal/infra/persistence"
 	"MSTransaccionesFinancieras/internal/utils"
@@ -21,8 +22,19 @@ type Cuentas struct {
 	FechaProceso   string
 }
 
-// TODO: limite se tiene que obtener de db relacional
-const LimiteHistorialBalances uint32 = 100
+const limiteHistorialBalancesPorDefecto uint32 = 100
+
+func obtenerLimiteHistorialBalances() uint32 {
+	p := &Parametros{Parametro: "LIMITEHISTORIALBALANCE"}
+	if _, err := p.Dame(); err != nil || p.Valor == "" {
+		return limiteHistorialBalancesPorDefecto
+	}
+	val, err := strconv.ParseUint(p.Valor, 10, 32)
+	if err != nil {
+		return limiteHistorialBalancesPorDefecto
+	}
+	return uint32(val)
+}
 
 func (c *Cuentas) Dame() error {
 	if c.IdUsuarioFinal <= 0 || c.IdMoneda <= 0 {
@@ -80,7 +92,7 @@ func (c *Cuentas) Dame() error {
 	return nil
 }
 
-func (c *Cuentas) DameHistorialBalances(timestampMin uint64, timestampMax uint64, limite uint32) ([]types.AccountBalance, error) {
+func (c *Cuentas) BuscarTransferenciasCuenta(FechaInicio uint64, FechaFin uint64, Limite uint32) ([]types.Transfer, error) {
 	if c.IdUsuarioFinal <= 0 || c.IdMoneda <= 0 {
 		return nil, errors.New("IdUsuarioFinal e IdMoneda son requeridos y deben ser mayores a cero")
 	}
@@ -95,15 +107,45 @@ func (c *Cuentas) DameHistorialBalances(timestampMin uint64, timestampMax uint64
 		return nil, errors.New("Conexión a TigerBeetle no inicializada")
 	}
 
-	if limite <= 0 {
-		limite = LimiteHistorialBalances
+	if Limite <= 0 {
+		Limite = obtenerLimiteHistorialBalances()
 	}
 
 	filtro := types.AccountFilter{
 		AccountID:    idCuentaCast,
-		TimestampMin: timestampMin,
-		TimestampMax: timestampMax,
-		Limit:        limite,
+		TimestampMin: FechaInicio,
+		TimestampMax: FechaFin,
+		Limit:        Limite,
+		Flags:        7, // Debits(1) + Credits(2) + Reversed(4) → más reciente primero
+	}
+
+	return persistence.ClienteTB.GetAccountTransfers(filtro)
+}
+
+func (c *Cuentas) DameHistorialBalances(FechaInicio uint64, FechaFin uint64, Limite uint32) ([]types.AccountBalance, error) {
+	if c.IdUsuarioFinal <= 0 || c.IdMoneda <= 0 {
+		return nil, errors.New("IdUsuarioFinal e IdMoneda son requeridos y deben ser mayores a cero")
+	}
+
+	idCuentaStr := utils.ConcatenarIDString(uint64(c.IdMoneda), c.IdUsuarioFinal)
+	idCuentaCast, err := utils.ParsearUint128(idCuentaStr)
+	if err != nil {
+		return nil, errors.New("Error al construir IdCuenta: " + err.Error())
+	}
+
+	if persistence.ClienteTB == nil {
+		return nil, errors.New("Conexión a TigerBeetle no inicializada")
+	}
+
+	if Limite <= 0 {
+		Limite = obtenerLimiteHistorialBalances()
+	}
+
+	filtro := types.AccountFilter{
+		AccountID:    idCuentaCast,
+		TimestampMin: FechaInicio,
+		TimestampMax: FechaFin,
+		Limit:        Limite,
 		Flags:        3, // Debits(1) + Credits(2)
 	}
 

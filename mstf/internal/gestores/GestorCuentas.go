@@ -26,17 +26,17 @@ func NewGestorCuentas() *GestorCuentas {
 	return &GestorCuentas{}
 }
 
-// Buscar cuentas según los filtros especificados.
-// Si idsCuenta tiene elementos, hace LookupAccounts directo e ignora el resto de filtros.
+// BuscarAvanzado busca cuentas según los filtros especificados.
+// Si IdsCuenta tiene elementos, hace LookupAccounts directo e ignora el resto de filtros.
 // Parámetros con valor 0 desactivan ese filtro en TigerBeetle.
-// estado: "A" para activas, "I" para inactivas/cerradas, "" para todas.
-// limit: máximo número de cuentas a retornar (0 = sin límite).
-func (gc *GestorCuentas) Buscar(
-	idsCuenta []types.Uint128,
-	idUsuarioFinal uint64,
-	idMoneda uint32,
-	estado string,
-	limit uint32,
+// Estado: "A" para activas, "I" para inactivas/cerradas, "" para todas.
+// Limit: máximo número de cuentas a retornar (0 = sin límite).
+func (gc *GestorCuentas) BuscarAvanzado(
+	IdsCuenta []types.Uint128,
+	IdUsuarioFinal uint64,
+	IdMoneda uint32,
+	Estado string,
+	Limit uint32,
 ) ([]types.Account, error) {
 
 	if persistence.ClienteTB == nil {
@@ -44,8 +44,8 @@ func (gc *GestorCuentas) Buscar(
 	}
 
 	// Camino A: lookup directo por IDs (ignora el resto de parámetros)
-	if len(idsCuenta) > 0 {
-		return persistence.ClienteTB.LookupAccounts(idsCuenta)
+	if len(IdsCuenta) > 0 {
+		return persistence.ClienteTB.LookupAccounts(IdsCuenta)
 	}
 
 	resultados := make([]types.Account, 0)
@@ -53,14 +53,14 @@ func (gc *GestorCuentas) Buscar(
 	// Timestamp para paginación
 	var timestampMin uint64 = 0
 
-	batchSize := limit
+	batchSize := Limit
 
 	// Iterar hasta alcanzar el límite total solicitado
 	for {
 		// Calcular cuántos resultados faltan para alcanzar el límite
-		restantes := limit - uint32(len(resultados))
+		restantes := Limit - uint32(len(resultados))
 		if restantes == 0 {
-			log.Printf("GestorCuentas.Buscar: Límite alcanzado (%d cuentas)", limit)
+			log.Printf("GestorCuentas.BuscarAvanzado: Límite alcanzado (%d cuentas)", Limit)
 			break
 		}
 
@@ -72,10 +72,10 @@ func (gc *GestorCuentas) Buscar(
 
 		filter := types.QueryFilter{
 			UserData128:  types.ToUint128(0),
-			UserData64:   idUsuarioFinal,
+			UserData64:   IdUsuarioFinal,
 			UserData32:   0,
 			Code:         0,
-			Ledger:       idMoneda,
+			Ledger:       IdMoneda,
 			TimestampMin: timestampMin,
 			TimestampMax: 0,
 			Limit:        currentBatchSize,
@@ -84,14 +84,14 @@ func (gc *GestorCuentas) Buscar(
 			}.ToUint32(),
 		}
 
-		log.Printf("GestorCuentas.Buscar: Ejecutando QueryAccounts (TimestampMin=%d, Limit=%d)", timestampMin, currentBatchSize)
+		log.Printf("GestorCuentas.BuscarAvanzado: Ejecutando QueryAccounts (TimestampMin=%d, Limit=%d)", timestampMin, currentBatchSize)
 		accounts, err := persistence.ClienteTB.QueryAccounts(filter)
 		if err != nil {
-			log.Printf("ERROR [GestorCuentas.Buscar]: Fallo QueryAccounts: %v", err)
+			log.Printf("ERROR [GestorCuentas.BuscarAvanzado]: Fallo QueryAccounts: %v", err)
 			return nil, err
 		}
 
-		log.Printf("GestorCuentas.Buscar: Obtenidos %d resultados en esta iteración", len(accounts))
+		log.Printf("GestorCuentas.BuscarAvanzado: Obtenidos %d resultados en esta iteración", len(accounts))
 
 		if len(accounts) == 0 {
 			break
@@ -100,13 +100,13 @@ func (gc *GestorCuentas) Buscar(
 		resultados = append(resultados, accounts...)
 
 		if uint32(len(accounts)) < currentBatchSize {
-			log.Printf("GestorCuentas.Buscar: Obtenidos %d < %d, no hay más resultados", len(accounts), currentBatchSize)
+			log.Printf("GestorCuentas.BuscarAvanzado: Obtenidos %d < %d, no hay más resultados", len(accounts), currentBatchSize)
 			break
 		}
 		ultimoTimestamp := accounts[len(accounts)-1].Timestamp
 		timestampMin = ultimoTimestamp + 1
 
-		log.Printf("GestorCuentas.Buscar: Obtenidos %d == %d, continuando iteración", len(accounts), currentBatchSize)
+		log.Printf("GestorCuentas.BuscarAvanzado: Obtenidos %d == %d, continuando iteración", len(accounts), currentBatchSize)
 
 		// (TO DO: mejorar paginación - traer siempre el max que se musetran en la pagina y avanzar con el timestamp del mas viejo en cada llamado)
 		if len(resultados) > 50000 {
@@ -115,11 +115,11 @@ func (gc *GestorCuentas) Buscar(
 		}
 	}
 
-	log.Printf("GestorCuentas.Buscar: Total acumulado antes de filtrar por estado: %d cuentas", len(resultados))
+	log.Printf("GestorCuentas.BuscarAvanzado: Total acumulado antes de filtrar por estado: %d cuentas", len(resultados))
 
-	if estado != "" {
-		resultados = filtrarPorEstado(resultados, estado)
-		log.Printf("GestorCuentas.Buscar: Después de filtrar por estado '%s': %d cuentas", estado, len(resultados))
+	if Estado != "" {
+		resultados = filtrarPorEstado(resultados, Estado)
+		log.Printf("GestorCuentas.BuscarAvanzado: Después de filtrar por estado '%s': %d cuentas", Estado, len(resultados))
 	}
 
 	return resultados, nil
@@ -128,7 +128,13 @@ func (gc *GestorCuentas) Buscar(
 // Crear intenta crear una cuenta en TigerBeetle.
 // Retorna (idCuenta, existe, error).
 // existe=true indica que la cuenta ya existía con los mismos parámetros (idempotencia ante reintentos).
-func (gc *GestorCuentas) Crear(idMoneda uint32, idUsuarioFinal uint64, fechaAlta string, debitosNoDebenExcederCreditos bool) (string, bool, error) {
+// Si Cuenta.IdUsuarioFinal es 0, se trata como cuenta empresa (DebitsMustNotExceedCredits=false).
+func (gc *GestorCuentas) Crear(Cuenta models.Cuentas) (string, bool, error) {
+	idMoneda := Cuenta.IdMoneda
+	idUsuarioFinal := Cuenta.IdUsuarioFinal
+	fechaAlta := Cuenta.Fecha
+	debitosNoDebenExcederCreditos := Cuenta.IdUsuarioFinal != 0
+
 	if persistence.ClienteTB == nil {
 		return "", false, errors.New("Conexión a TigerBeetle no inicializada")
 	}
@@ -185,18 +191,18 @@ func (gc *GestorCuentas) Crear(idMoneda uint32, idUsuarioFinal uint64, fechaAlta
 	return idCuenta, false, nil
 }
 
-// Crea múltiples cuentas en TigerBeetle en un solo llamado.
+// CrearLote crea múltiples cuentas en TigerBeetle en un solo llamado.
 // Recibe los mismos datos que Crear pero como array.
-func (gc *GestorCuentas) CrearLote(cuentas []CuentaNueva) ([]string, error) {
+func (gc *GestorCuentas) CrearLote(Cuentas []CuentaNueva) ([]string, error) {
 	if persistence.ClienteTB == nil {
 		return nil, errors.New("Conexión a TigerBeetle no inicializada")
 	}
-	if len(cuentas) == 0 {
+	if len(Cuentas) == 0 {
 		return []string{}, nil
 	}
 
 	// Verificar que la moneda de cada cuenta exista y esté activa
-	for _, c := range cuentas {
+	for _, c := range Cuentas {
 		moneda := &models.Monedas{IdMoneda: int(c.IdMoneda)}
 		if _, err := moneda.Dame(); err != nil {
 			return nil, fmt.Errorf("La moneda no existe o no está activa (IdMoneda=%d)", c.IdMoneda)
@@ -206,10 +212,10 @@ func (gc *GestorCuentas) CrearLote(cuentas []CuentaNueva) ([]string, error) {
 		}
 	}
 
-	cuentasTB := make([]types.Account, 0, len(cuentas))
-	ids := make([]string, 0, len(cuentas))
+	cuentasTB := make([]types.Account, 0, len(Cuentas))
+	ids := make([]string, 0, len(Cuentas))
 
-	for _, c := range cuentas {
+	for _, c := range Cuentas {
 		idCuenta := utils.ConcatenarIDString(uint64(c.IdMoneda), c.IdUsuarioFinal)
 		if idCuenta == "" || idCuenta == "0" {
 			return nil, fmt.Errorf("IdCuenta no puede ser vacío o cero (IdMoneda=%d, Usuario=%d)", c.IdMoneda, c.IdUsuarioFinal)
@@ -257,7 +263,7 @@ func (gc *GestorCuentas) CrearLote(cuentas []CuentaNueva) ([]string, error) {
 		}
 	}
 	if fallosReales > 0 {
-		return nil, fmt.Errorf("fallo en la creación de %d de %d cuentas", fallosReales, len(cuentas))
+		return nil, fmt.Errorf("fallo en la creación de %d de %d cuentas", fallosReales, len(Cuentas))
 	}
 
 	return ids, nil
@@ -266,7 +272,10 @@ func (gc *GestorCuentas) CrearLote(cuentas []CuentaNueva) ([]string, error) {
 // Desactivar cierra una cuenta en TigerBeetle creando un pending transfer con closing_debit.
 // La cuenta empresa de la moneda actúa como cuenta crédito (monto 0, no se transfiere dinero).
 // Idempotente: si la cuenta ya está cerrada, retorna nil.
-func (gc *GestorCuentas) Desactivar(idMoneda uint32, idUsuarioFinal uint64) error {
+func (gc *GestorCuentas) Desactivar(Cuenta models.Cuentas) error {
+	idMoneda := Cuenta.IdMoneda
+	idUsuarioFinal := Cuenta.IdUsuarioFinal
+
 	if persistence.ClienteTB == nil {
 		return errors.New("Conexión a TigerBeetle no inicializada")
 	}
@@ -341,7 +350,10 @@ func (gc *GestorCuentas) Desactivar(idMoneda uint32, idUsuarioFinal uint64) erro
 // Busca la transfer de cierre como la más reciente en débito de la cuenta (la única posible
 // tras el cierre, ya que TB rechaza nuevas transfers sobre cuentas cerradas).
 // Idempotente: si la cuenta ya está activa, retorna nil.
-func (gc *GestorCuentas) Activar(idMoneda uint32, idUsuarioFinal uint64) error {
+func (gc *GestorCuentas) Activar(Cuenta models.Cuentas) error {
+	idMoneda := Cuenta.IdMoneda
+	idUsuarioFinal := Cuenta.IdUsuarioFinal
+
 	if persistence.ClienteTB == nil {
 		return errors.New("Conexión a TigerBeetle no inicializada")
 	}
@@ -411,16 +423,6 @@ func (gc *GestorCuentas) Activar(idMoneda uint32, idUsuarioFinal uint64) error {
 
 	log.Printf("GestorCuentas.Activar: cuenta %s activada exitosamente", idCuentaStr)
 	return nil
-}
-
-// TODO
-func (gc *GestorCuentas) Borrar(id types.Uint128) (string, error) {
-	return "Borrado lógico no implementado", errors.New("No implementado")
-}
-
-// TODO
-func (gc *GestorCuentas) Modificar(cuenta models.Cuentas) (string, error) {
-	return "Modificación no implementada", errors.New("No implementado")
 }
 
 // --------------------------------------------------------------------------------
