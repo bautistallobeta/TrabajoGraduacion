@@ -55,7 +55,7 @@ func (t *Transferencias) Dame() error {
 
 	transferenciaTB := transfers[0]
 
-	// TODO: corregir esto - quedó de cuando guardaba el itmestamp en userdata128 -  "transferencias nuevas usan UserData32 (segundos), viejas usan UserData128 (nanosegundos)"
+	// Compatibilidad: transfers nuevas usan UserData32 (segundos epoch), viejas usaban UserData128 (nanosegundos).
 	var fecha string
 	if transferenciaTB.UserData32 > 0 {
 		fecha, _ = utils.UserData32AFecha(transferenciaTB.UserData32)
@@ -118,29 +118,29 @@ func (t *Transferencias) Dame() error {
 // sin realizar consultas adicionales a cuentas ni monedas.
 // Tipo queda vacío para transfers normales (requiere lookup de cuenta empresa para derivarlo).
 // IdUsuarioFinal se lee de UserData128 (solo disponible en transfers creadas tras el cambio que lo almacena ahí).
-func (t *Transferencias) PoblarDesdeTB(tb types.Transfer) {
-	t.IdTransferencia = utils.Uint128AStringDecimal(tb.ID)
-	t.IdCuentaDebito = utils.Uint128AStringDecimal(tb.DebitAccountID)
-	t.IdCuentaCredito = utils.Uint128AStringDecimal(tb.CreditAccountID)
-	t.IdMoneda = tb.Ledger
-	t.Monto = utils.Uint128ADecimalMoneda(tb.Amount)
-	t.Categoria = tb.UserData64
+func (t *Transferencias) PoblarDesdeTB(Tb types.Transfer) {
+	t.IdTransferencia = utils.Uint128AStringDecimal(Tb.ID)
+	t.IdCuentaDebito = utils.Uint128AStringDecimal(Tb.DebitAccountID)
+	t.IdCuentaCredito = utils.Uint128AStringDecimal(Tb.CreditAccountID)
+	t.IdMoneda = Tb.Ledger
+	t.Monto = utils.Uint128ADecimalMoneda(Tb.Amount)
+	t.Categoria = Tb.UserData64
 
-	if tb.Code == CodigoTransferenciaReversion {
+	if Tb.Code == CodigoTransferenciaReversion {
 		t.Estado = "R"
 		t.Tipo = "R"
-		t.IdTransferenciaOriginal = utils.Uint128AStringDecimal(tb.UserData128)
+		t.IdTransferenciaOriginal = utils.Uint128AStringDecimal(Tb.UserData128)
 	} else {
 		t.Estado = "F"
-		t.IdUsuarioFinal = binary.LittleEndian.Uint64(tb.UserData128[:8])
+		t.IdUsuarioFinal = binary.LittleEndian.Uint64(Tb.UserData128[:8])
 	}
 
-	if tb.UserData32 > 0 {
-		if fecha, err := utils.UserData32AFecha(tb.UserData32); err == nil {
+	if Tb.UserData32 > 0 {
+		if fecha, err := utils.UserData32AFecha(Tb.UserData32); err == nil {
 			t.Fecha = fecha
 		}
 	}
-	if tb.Timestamp != 0 {
-		t.FechaProceso = utils.TimestampAFecha(tb.Timestamp)
+	if Tb.Timestamp != 0 {
+		t.FechaProceso = utils.TimestampAFecha(Tb.Timestamp)
 	}
 }

@@ -23,37 +23,37 @@ func NewGestorTransferencias(notificador *webhook.Notificador) *GestorTransferen
 	}
 }
 
-// Busca transferencias según los filtros especificados.
-// Si idsTransferencia tiene elementos, hace LookupTransfers directo e ignora el resto de filtros.
+// BuscarAvanzado busca transferencias según los filtros especificados.
+// Si IdsTransferencia tiene elementos, hace LookupTransfers directo e ignora el resto de filtros.
 // Parámetros numéricos con valor 0 deshabilitan ese filtro en TigerBeetle.
-// estado: "F" para finalizadas, "R" para revertidas, "" para todas.
-// montoMin/montoMax: filtrado client-side, 0 = sin límite.
-// timestampMin/timestampMax: nanosegundos epoch (Timestamp de TB, no UserData32).
+// Estado: "F" para finalizadas, "R" para revertidas, "" para todas.
+// MontoMin/MontoMax: filtrado client-side, 0 = sin límite.
+// FechaInicio/FechaFin: nanosegundos epoch (Timestamp de TB, no UserData32).
 // Los resultados se ordenan de más reciente a más antigua.
-func (gt *GestorTransferencias) Buscar(
-	idsTransferencia []types.Uint128,
-	idUsuarioFinal uint64,
-	idCategoria uint64,
-	idMoneda uint32,
-	estado string,
-	montoMin uint64,
-	montoMax uint64,
-	timestampMin uint64,
-	timestampMax uint64,
-	limit uint32,
+func (gt *GestorTransferencias) BuscarAvanzado(
+	IdsTransferencia []types.Uint128,
+	IdUsuarioFinal uint64,
+	IdCategoria uint64,
+	IdMoneda uint32,
+	Estado string,
+	MontoMin uint64,
+	MontoMax uint64,
+	FechaInicio uint64,
+	FechaFin uint64,
+	Limit uint32,
 ) ([]types.Transfer, error) {
 	if persistence.ClienteTB == nil {
 		return nil, errors.New("Conexión a TigerBeetle no inicializada")
 	}
 
 	// Camino A: lookup directo por IDs (ignora el resto de parámetros)
-	if len(idsTransferencia) > 0 {
-		return persistence.ClienteTB.LookupTransfers(idsTransferencia)
+	if len(IdsTransferencia) > 0 {
+		return persistence.ClienteTB.LookupTransfers(IdsTransferencia)
 	}
 
 	// Mapear estado a Code de TB
 	var codigo uint16 = 0
-	switch estado {
+	switch Estado {
 	case "F":
 		codigo = models.CodigoTransferenciaNormal
 	case "R":
@@ -61,30 +61,30 @@ func (gt *GestorTransferencias) Buscar(
 	}
 
 	resultados := make([]types.Transfer, 0)
-	cursorTimestampMax := timestampMax // avanza hacia atrás en cada página (reversed=true)
+	cursorTimestampMax := FechaFin // avanza hacia atrás en cada página (reversed=true)
 
 	for {
-		restantes := limit - uint32(len(resultados))
+		restantes := Limit - uint32(len(resultados))
 		if restantes == 0 {
 			break
 		}
 
 		filter := types.QueryFilter{
-			UserData128:  types.ToUint128(idUsuarioFinal),
-			UserData64:   idCategoria,
+			UserData128:  types.ToUint128(IdUsuarioFinal),
+			UserData64:   IdCategoria,
 			UserData32:   0,
 			Code:         codigo,
-			Ledger:       idMoneda,
-			TimestampMin: timestampMin,
+			Ledger:       IdMoneda,
+			TimestampMin: FechaInicio,
 			TimestampMax: cursorTimestampMax,
 			Limit:        restantes,
 			Flags:        types.QueryFilterFlags{Reversed: true}.ToUint32(),
 		}
 
-		log.Printf("GestorTransferencias.Buscar: Ejecutando QueryTransfers (TimestampMax=%d, Limit=%d)", cursorTimestampMax, restantes)
+		log.Printf("GestorTransferencias.BuscarAvanzado: Ejecutando QueryTransfers (TimestampMax=%d, Limit=%d)", cursorTimestampMax, restantes)
 		transfers, err := persistence.ClienteTB.QueryTransfers(filter)
 		if err != nil {
-			log.Printf("ERROR [GestorTransferencias.Buscar]: QueryTransfers falló: %v", err)
+			log.Printf("ERROR [GestorTransferencias.BuscarAvanzado]: QueryTransfers falló: %v", err)
 			return nil, err
 		}
 
@@ -96,11 +96,11 @@ func (gt *GestorTransferencias) Buscar(
 			if t.Code == models.CodigoTransferenciaCierre {
 				continue
 			}
-			if !pasaFiltroMonto(t, montoMin, montoMax) {
+			if !pasaFiltroMonto(t, MontoMin, MontoMax) {
 				continue
 			}
 			resultados = append(resultados, t)
-			if uint32(len(resultados)) >= limit {
+			if uint32(len(resultados)) >= Limit {
 				break
 			}
 		}
@@ -109,7 +109,7 @@ func (gt *GestorTransferencias) Buscar(
 			break
 		}
 
-		if uint32(len(resultados)) >= limit {
+		if uint32(len(resultados)) >= Limit {
 			break
 		}
 
@@ -121,36 +121,36 @@ func (gt *GestorTransferencias) Buscar(
 		cursorTimestampMax = ultimoTimestamp - 1
 
 		if len(resultados) > 50000 {
-			log.Printf("ADVERTENCIA [GestorTransferencias.Buscar]: Límite de seguridad alcanzado (50.000 transferencias)")
+			log.Printf("ADVERTENCIA [GestorTransferencias.BuscarAvanzado]: Límite de seguridad alcanzado (50.000 transferencias)")
 			break
 		}
 	}
 
-	log.Printf("GestorTransferencias.Buscar: Total encontrado: %d transferencias", len(resultados))
+	log.Printf("GestorTransferencias.BuscarAvanzado: Total encontrado: %d transferencias", len(resultados))
 	return resultados, nil
 }
 
-// Procesa un lote de transferencias recibido del consumidor Kafka.
+// ProcesarLote procesa un lote de transferencias recibido del consumidor Kafka.
 // Valida reglas de negocio antes de enviar a TigerBeetle.
 // Las transferencias que fallan validación no van a TB pero sí se notifican con su error.
-// fallidasParseo son transferencias que fallaron en el parseo del mensaje Kafka (también se notifican)
-func (gt *GestorTransferencias) ProcesarLote(batch []types.Transfer, kafkaMsgs []models.KafkaTransferencias, fallidasParseo []models.TransferenciaNotificada) error {
+// FallidasParseo son transferencias que fallaron en el parseo del mensaje Kafka (también se notifican)
+func (gt *GestorTransferencias) ProcesarLote(Batch []types.Transfer, KafkaMsgs []models.KafkaTransferencias, FallidasParseo []models.TransferenciaNotificada) error {
 	var paraEnviar []types.Transfer
 	var kafkaMsgsValidos []models.KafkaTransferencias
-	fallidas := append([]models.TransferenciaNotificada{}, fallidasParseo...)
+	fallidas := append([]models.TransferenciaNotificada{}, FallidasParseo...)
 
 	// validar existencia y saldo de cuentas antes de ir a TigerBeetle
-	erroresCuentas, err := gt.preValidarCuentas(batch)
+	erroresCuentas, err := gt.preValidarCuentas(Batch)
 	if err != nil {
 		// error de infraestructura (TB caído) → no notificar, dejar que procesarConRetry reintente
 		log.Printf("ERROR [GestorTransferencias.ProcesarLote]: Error de infraestructura en preValidarCuentas: %v", err)
 		return err
 	}
 
-	for i, t := range batch {
+	for i, t := range Batch {
 		if erroresCuentas[i] != "" {
 			log.Printf("[VALIDACIÓN] Transfer ID %s rechazada: %s", utils.Uint128AStringDecimal(t.ID), erroresCuentas[i])
-			fallidas = append(fallidas, models.NewTransferenciaNotificadaError(t, kafkaMsgs[i], erroresCuentas[i]))
+			fallidas = append(fallidas, models.NewTransferenciaNotificadaError(t, KafkaMsgs[i], erroresCuentas[i]))
 			continue
 		}
 
@@ -158,7 +158,7 @@ func (gt *GestorTransferencias) ProcesarLote(batch []types.Transfer, kafkaMsgs [
 		var estadoError string
 		if t.Code == models.CodigoTransferenciaReversion {
 			var errInfra error
-			estadoError, errInfra = gt.validarReversion(t, kafkaMsgs[i])
+			estadoError, errInfra = gt.validarReversion(t, KafkaMsgs[i])
 			if errInfra != nil {
 				// error de infraestructura (TB caído) → no notificar, dejar que procesarConRetry reintente
 				log.Printf("ERROR [GestorTransferencias.ProcesarLote]: Error de infraestructura en validarReversion: %v", errInfra)
@@ -169,15 +169,15 @@ func (gt *GestorTransferencias) ProcesarLote(batch []types.Transfer, kafkaMsgs [
 		}
 		if estadoError != "" {
 			log.Printf("[VALIDACIÓN] Transfer ID %s rechazada: %s", utils.Uint128AStringDecimal(t.ID), estadoError)
-			fallidas = append(fallidas, models.NewTransferenciaNotificadaError(t, kafkaMsgs[i], estadoError))
+			fallidas = append(fallidas, models.NewTransferenciaNotificadaError(t, KafkaMsgs[i], estadoError))
 		} else {
 			paraEnviar = append(paraEnviar, t)
-			kafkaMsgsValidos = append(kafkaMsgsValidos, kafkaMsgs[i])
+			kafkaMsgsValidos = append(kafkaMsgsValidos, KafkaMsgs[i])
 		}
 	}
 
 	if len(fallidas) > 0 {
-		log.Printf("VALIDACIÓN: %d de %d transfers rechazadas antes de TigerBeetle.", len(fallidas), len(batch)+len(fallidasParseo))
+		log.Printf("VALIDACIÓN: %d de %d transfers rechazadas antes de TigerBeetle.", len(fallidas), len(Batch)+len(FallidasParseo))
 	}
 
 	var results []types.TransferEventResult

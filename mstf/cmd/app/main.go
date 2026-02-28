@@ -9,6 +9,7 @@ import (
 	"syscall"
 	"time"
 
+	"MSTransaccionesFinancieras/internal/auth"
 	"MSTransaccionesFinancieras/internal/config"
 	"MSTransaccionesFinancieras/internal/gestores"
 	httpRouter "MSTransaccionesFinancieras/internal/http"
@@ -26,11 +27,8 @@ import (
 func inicializarCuentasEmpresa() error {
 	log.Println("Inicializando cuentas empresa...")
 
-	// TODO: eliminar hardcodeo de token
-	const tokenAdmin = "cf904666e02a79cfd50b074ab3c360c0"
-
 	gm := gestores.NewGestorMonedas()
-	monedas, err := gm.Listar("N")
+	monedas, err := gm.Listar("T")
 	if err != nil {
 		log.Printf("ERROR [inicializarCuentasEmpresa]: No se pudieron listar monedas: %v", err)
 		return err
@@ -61,7 +59,8 @@ func inicializarCuentasEmpresa() error {
 		}
 		ids = append(ids, tbId)
 		infoMap[tbId] = monedaInfo{
-			idMoneda:  m.IdMoneda,
+			idMoneda: m.IdMoneda,
+			// No modificar la fecha. Es es una fecha de referencia fija en Go para formatear fechas (YYYY-MM-DD).
 			fechaAlta: m.FechaAlta.Format("2006-01-02"),
 			estado:    m.Estado,
 		}
@@ -124,7 +123,7 @@ func inicializarCuentasEmpresa() error {
 		// Si la cuenta empresa no llegó a crearse en TB, crearla ahora
 		if !existe[tbId] {
 			log.Printf("Creando cuenta empresa faltante para moneda pendiente %d...", mi.idMoneda)
-			_, _, err := gc.Crear(uint32(mi.idMoneda), 0, mi.fechaAlta, false)
+			_, _, err := gc.Crear(models.Cuentas{IdMoneda: uint32(mi.idMoneda), IdUsuarioFinal: 0, Fecha: mi.fechaAlta})
 			if err != nil {
 				log.Printf("ERROR [inicializarCuentasEmpresa]: No se pudo crear cuenta empresa para moneda pendiente %d: %v", mi.idMoneda, err)
 				return err
@@ -132,9 +131,11 @@ func inicializarCuentasEmpresa() error {
 			log.Printf("Cuenta empresa creada para moneda pendiente %d.", mi.idMoneda)
 		}
 
-		// Activar la moneda (P -> A)
+		// Activar la moneda (P -> A). Actor SISTEMA: credencial no se valida en el SP.
+		ctxSistema := context.WithValue(context.Background(), auth.ClaveCredencial, "")
+		ctxSistema = context.WithValue(ctxSistema, auth.ClaveActor, "SISTEMA")
 		moneda := &models.Monedas{IdMoneda: mi.idMoneda}
-		mensaje, err := moneda.Activar(tokenAdmin, "SISTEMA")
+		mensaje, err := moneda.Activar(ctxSistema)
 		if err != nil {
 			log.Printf("ERROR [inicializarCuentasEmpresa]: No se pudo activar moneda pendiente %d: %v", mi.idMoneda, err)
 			return err
@@ -179,7 +180,6 @@ func main() {
 	consumidor.Start()
 
 	// Productor Kafka (unicamente para probar inserción de mensajes en la cola)
-	// TODO: aclarar en docmentación que esto es solo para pruebas y para la demostración de la creación de transferancias
 	productor, err := kafkamstf.InitProductor(cfg)
 	if err != nil {
 		log.Fatalf("FATAL: No se pudo conectar a Kafka (Productor): %v", err)

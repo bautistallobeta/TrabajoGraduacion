@@ -2,7 +2,6 @@ package controllers
 
 import (
 	"MSTransaccionesFinancieras/internal/gestores"
-	httpMiddleware "MSTransaccionesFinancieras/internal/http/middlewares"
 	"MSTransaccionesFinancieras/internal/models"
 	"MSTransaccionesFinancieras/internal/utils"
 	"log"
@@ -27,7 +26,7 @@ func (mc *MonedasControlador) Dame(c echo.Context) error {
 	}
 	req := &Request{}
 	if err := c.Bind(req); err != nil {
-		return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta("Parámetros inválidos: "+err.Error()))
+		return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta("Parámetros inválidos: "+utils.SanitizarError(err)))
 	}
 	if req.IdMoneda <= 0 {
 		return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta("IdMoneda es campo obligatorio"))
@@ -35,7 +34,7 @@ func (mc *MonedasControlador) Dame(c echo.Context) error {
 	param := &models.Monedas{IdMoneda: req.IdMoneda}
 	mensaje, err := param.Dame()
 	if err != nil {
-		return c.JSON(http.StatusInternalServerError, models.NewErrorRespuesta("Error al obtener moneda: "+err.Error()))
+		return c.JSON(http.StatusInternalServerError, models.NewErrorRespuesta("Error al obtener moneda: "+utils.SanitizarError(err)))
 	}
 	if mensaje != "OK" {
 		return c.JSON(http.StatusNotFound, models.NewErrorRespuesta(mensaje))
@@ -45,15 +44,20 @@ func (mc *MonedasControlador) Dame(c echo.Context) error {
 
 func (mc *MonedasControlador) Listar(c echo.Context) error {
 	type Request struct {
-		IncluyeBajas string `query:"IncluyeBajas"`
+		IncluyeInactivos string `query:"IncluyeInactivos"`
 	}
 	req := &Request{}
 	if err := c.Bind(req); err != nil {
-		return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta("Parámetros inválidos: "+err.Error()))
+		return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta("Parámetros inválidos: "+utils.SanitizarError(err)))
 	}
-	monedas, err := mc.Gestor.Listar(req.IncluyeBajas)
+	if req.IncluyeInactivos == "" {
+		req.IncluyeInactivos = "N"
+	} else if req.IncluyeInactivos != "N" && req.IncluyeInactivos != "S" {
+		return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta("IncluyeInactivos debe ser 'S' o 'N'"))
+	}
+	monedas, err := mc.Gestor.Listar(req.IncluyeInactivos)
 	if err != nil {
-		return c.JSON(http.StatusInternalServerError, models.NewErrorRespuesta("Error al buscar monedas: "+err.Error()))
+		return c.JSON(http.StatusInternalServerError, models.NewErrorRespuesta("Error al buscar monedas: "+utils.SanitizarError(err)))
 	}
 	return c.JSON(http.StatusOK, monedas)
 }
@@ -64,7 +68,7 @@ func (mc *MonedasControlador) Crear(c echo.Context) error {
 	}
 	req := &Request{}
 	if err := c.Bind(req); err != nil {
-		return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta("Parámetros inválidos: "+err.Error()))
+		return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta("Parámetros inválidos: "+utils.SanitizarError(err)))
 	}
 	if req.IdMoneda <= 0 {
 		return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta("IdMoneda es campo obligatorio"))
@@ -76,35 +80,34 @@ func (mc *MonedasControlador) Crear(c echo.Context) error {
 	// si tigerbeetle falla, borra la moneda creada;
 	// si falla la activacion, borra la moneda pero no la cuenta empresa (TB no permite borrar cuentas)
 	// si se reintenta la creacion de la misma moneda, al llegar al punto de TB, si TB retorna AccountExists y se busca que la account no tenga transfers, entonces no se lo toma por error pues indicaría que se está reintentando.
-	credencial, _ := c.Get(httpMiddleware.ClaveCredencial).(string)
-	actor, _ := c.Get(httpMiddleware.ClaveActor).(string)
-	mensaje, err := mc.Gestor.Crear(credencial, actor, req.IdMoneda, utils.ConcatenarIDString(uint64(req.IdMoneda), uint64(0)))
+	ctx := c.Request().Context()
+	mensaje, err := mc.Gestor.Crear(ctx, models.Monedas{IdMoneda: req.IdMoneda, IdCuentaEmpresa: utils.ConcatenarIDString(uint64(req.IdMoneda), uint64(0))})
 	log.Printf("\n\nMonedasControlador.Crear: Resultado de creación en GestorMonedas: mensaje='%s', error='%v'", mensaje, err)
 	if err != nil {
-		return c.JSON(http.StatusInternalServerError, models.NewErrorRespuesta("Error al crear moneda: "+err.Error()))
+		return c.JSON(http.StatusInternalServerError, models.NewErrorRespuesta("Error al crear moneda: "+utils.SanitizarError(err)))
 	}
 	if mensaje != "OK" {
 		return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta(mensaje))
 	}
 
 	// intenta crear la cuenta empresa en TB, si falla, borra la moneda creada
-	mensaje, _, err = mc.GestorCuentas.Crear(uint32(req.IdMoneda), uint64(0), time.Now().Format("2006-01-02"), false)
+	mensaje, _, err = mc.GestorCuentas.Crear(models.Cuentas{IdMoneda: uint32(req.IdMoneda), IdUsuarioFinal: 0, Fecha: time.Now().Format("2006-01-02")})
 	if err != nil {
-		msjBorrar, errBorrar := mc.Gestor.Borrar(credencial, actor, req.IdMoneda)
+		msjBorrar, errBorrar := mc.Gestor.Borrar(ctx, models.Monedas{IdMoneda: req.IdMoneda})
 		if errBorrar != nil {
 			log.Printf("Error en rollback de creación moneda después de fallo en creación de cuenta: %v", errBorrar)
 		}
 		if msjBorrar != "OK" {
 			log.Printf("Error en rollback de creación moneda después de fallo en creación de cuenta: %s", msjBorrar)
 		}
-		return c.JSON(http.StatusInternalServerError, models.NewErrorRespuesta("Error al crear cuenta empresa: "+err.Error()))
+		return c.JSON(http.StatusInternalServerError, models.NewErrorRespuesta("Error al crear cuenta empresa: "+utils.SanitizarError(err)))
 	}
 
 	// si se creó la cuenta en TB, intenta activar la moneda, si falla, borra la moneda pero no la cuenta empresa (TB no permite borrar cuentas)
 	moneda := &models.Monedas{IdMoneda: req.IdMoneda}
-	mensaje, err = moneda.Activar(credencial, actor)
+	mensaje, err = moneda.Activar(ctx)
 	if err != nil || mensaje != "OK" {
-		msjBorrar, errBorrar := mc.Gestor.Borrar(credencial, actor, req.IdMoneda)
+		msjBorrar, errBorrar := mc.Gestor.Borrar(ctx, models.Monedas{IdMoneda: req.IdMoneda})
 		if errBorrar != nil {
 			log.Printf("Error en rollback de creación moneda después de fallo en activación de moneda: %v", errBorrar)
 		}
@@ -112,7 +115,7 @@ func (mc *MonedasControlador) Crear(c echo.Context) error {
 			log.Printf("Error en rollback de creación moneda después de fallo en activación de moneda: %s", msjBorrar)
 		}
 		if err != nil {
-			return c.JSON(http.StatusInternalServerError, models.NewErrorRespuesta("Error al activar moneda: "+err.Error()))
+			return c.JSON(http.StatusInternalServerError, models.NewErrorRespuesta("Error al activar moneda: "+utils.SanitizarError(err)))
 		} else {
 			return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta(mensaje))
 		}
@@ -124,15 +127,13 @@ func (mc *MonedasControlador) Borrar(c echo.Context) error {
 	type Request struct {
 		IdMoneda int `param:"IdMoneda"`
 	}
-	credencial, _ := c.Get(httpMiddleware.ClaveCredencial).(string)
-	actor, _ := c.Get(httpMiddleware.ClaveActor).(string)
 	req := &Request{}
 	if err := c.Bind(req); err != nil {
-		return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta("Parámetros inválidos: "+err.Error()))
+		return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta("Parámetros inválidos: "+utils.SanitizarError(err)))
 	}
-	mensaje, err := mc.Gestor.Borrar(credencial, actor, req.IdMoneda)
+	mensaje, err := mc.Gestor.Borrar(c.Request().Context(), models.Monedas{IdMoneda: req.IdMoneda})
 	if err != nil {
-		return c.JSON(http.StatusInternalServerError, models.NewErrorRespuesta("Error al borrar moneda: "+err.Error()))
+		return c.JSON(http.StatusInternalServerError, models.NewErrorRespuesta("Error al borrar moneda: "+utils.SanitizarError(err)))
 	}
 	if mensaje != "OK" {
 		return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta(mensaje))
@@ -144,19 +145,17 @@ func (mc *MonedasControlador) Activar(c echo.Context) error {
 	type Request struct {
 		IdMoneda int `param:"IdMoneda"`
 	}
-	credencial, _ := c.Get(httpMiddleware.ClaveCredencial).(string)
-	actor, _ := c.Get(httpMiddleware.ClaveActor).(string)
 	req := &Request{}
 	if err := c.Bind(req); err != nil {
-		return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta("Parámetros inválidos: "+err.Error()))
+		return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta("Parámetros inválidos: "+utils.SanitizarError(err)))
 	}
 	if req.IdMoneda <= 0 {
 		return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta("IdMoneda es campo obligatorio"))
 	}
 	moneda := &models.Monedas{IdMoneda: req.IdMoneda}
-	mensaje, err := moneda.Activar(credencial, actor)
+	mensaje, err := moneda.Activar(c.Request().Context())
 	if err != nil {
-		return c.JSON(http.StatusInternalServerError, models.NewErrorRespuesta("Error al activar moneda: "+err.Error()))
+		return c.JSON(http.StatusInternalServerError, models.NewErrorRespuesta("Error al activar moneda: "+utils.SanitizarError(err)))
 	}
 	if mensaje != "OK" {
 		return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta(mensaje))
@@ -168,19 +167,17 @@ func (mc *MonedasControlador) Desactivar(c echo.Context) error {
 	type Request struct {
 		IdMoneda int `param:"IdMoneda"`
 	}
-	credencial, _ := c.Get(httpMiddleware.ClaveCredencial).(string)
-	actor, _ := c.Get(httpMiddleware.ClaveActor).(string)
 	req := &Request{}
 	if err := c.Bind(req); err != nil {
-		return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta("Parámetros inválidos: "+err.Error()))
+		return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta("Parámetros inválidos: "+utils.SanitizarError(err)))
 	}
 	if req.IdMoneda <= 0 {
 		return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta("IdMoneda es campo obligatorio"))
 	}
 	moneda := &models.Monedas{IdMoneda: req.IdMoneda}
-	mensaje, err := moneda.Desactivar(credencial, actor)
+	mensaje, err := moneda.Desactivar(c.Request().Context())
 	if err != nil {
-		return c.JSON(http.StatusInternalServerError, models.NewErrorRespuesta("Error al desactivar moneda: "+err.Error()))
+		return c.JSON(http.StatusInternalServerError, models.NewErrorRespuesta("Error al desactivar moneda: "+utils.SanitizarError(err)))
 	}
 	if mensaje != "OK" {
 		return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta(mensaje))

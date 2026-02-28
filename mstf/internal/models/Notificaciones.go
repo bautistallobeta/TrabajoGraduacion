@@ -44,7 +44,6 @@ func NewTransferenciaNotificada(transfer types.Transfer, kafkaMsg KafkaTransfere
 		mensaje = result.Result.String()
 	}
 
-	// TODO: Fixear Fecha de la operación: decodificada desde UserData32 (segundos epoch almacenados al parsear).
 	// Si UserData32 es 0 (fecha no pudo parsearse al construir la transfer), se usa el valor raw de Kafka.
 	fecha := "-"
 	if transfer.UserData32 > 0 {

@@ -1,8 +1,10 @@
 package models
 
 import (
+	"MSTransaccionesFinancieras/internal/auth"
 	"MSTransaccionesFinancieras/internal/infra/cache"
 	"MSTransaccionesFinancieras/internal/infra/persistence"
+	"context"
 	"database/sql"
 	"strconv"
 	"time"
@@ -72,9 +74,8 @@ func (m *Monedas) Dame() (string, error) {
 
 // Activa una moneda pendiente asignando la cuenta empresa.
 // tsp_activar_moneda
-// - credencial: credencial del actor que realiza la operación
-// - actor: tipo de actor ('SISTEMA' o 'USUARIO')
-func (m *Monedas) Activar(credencial string, actor string) (string, error) {
+func (m *Monedas) Activar(ctx context.Context) (string, error) {
+	credencial, actor := auth.CredencialDesdeCtx(ctx)
 	var mensaje string
 	err := persistence.ClienteMySQL.QueryRow("CALL tsp_activar_moneda(?, ?, ?)", credencial, actor, m.IdMoneda).Scan(&mensaje)
 	if err != nil {
@@ -86,9 +87,8 @@ func (m *Monedas) Activar(credencial string, actor string) (string, error) {
 
 // Desactiva una moneda activa.
 // tsp_desactivar_moneda
-// - credencial: credencial del actor que realiza la operación
-// - actor: tipo de actor ('SISTEMA' o 'USUARIO')
-func (m *Monedas) Desactivar(credencial string, actor string) (string, error) {
+func (m *Monedas) Desactivar(ctx context.Context) (string, error) {
+	credencial, actor := auth.CredencialDesdeCtx(ctx)
 	var mensaje string
 	err := persistence.ClienteMySQL.QueryRow("CALL tsp_desactivar_moneda(?, ?, ?)", credencial, actor, m.IdMoneda).Scan(&mensaje)
 	if err != nil {

@@ -1,7 +1,9 @@
 package middlewares
 
 import (
+	"MSTransaccionesFinancieras/internal/auth"
 	"MSTransaccionesFinancieras/internal/models"
+	"context"
 	"net/http"
 	"strings"
 
@@ -58,6 +60,10 @@ func AutenticacionDual(skipper middleware.Skipper) echo.MiddlewareFunc {
 
 			c.Set(ClaveActor, actor)
 			c.Set(ClaveCredencial, credencial)
+
+			ctx := context.WithValue(c.Request().Context(), auth.ClaveCredencial, credencial)
+			ctx = context.WithValue(ctx, auth.ClaveActor, actor)
+			c.SetRequest(c.Request().WithContext(ctx))
 
 			return next(c)
 		}

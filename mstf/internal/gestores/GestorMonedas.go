@@ -1,8 +1,10 @@
 package gestores
 
 import (
+	"MSTransaccionesFinancieras/internal/auth"
 	"MSTransaccionesFinancieras/internal/infra/persistence"
 	"MSTransaccionesFinancieras/internal/models"
+	"context"
 	"errors"
 	"strconv"
 )
@@ -16,13 +18,12 @@ func NewGestorMonedas() *GestorMonedas {
 
 // Crea una moneda en estado P: Pendiente.
 // tsp_crear_moneda
-// - credencial: credencial del actor que realiza la operación
-// - actor: tipo de actor ('SISTEMA' o 'USUARIO')
-// - idMoneda: Id de la moneda a crear (viene de MisGastos)
-// - idCuentaEmpresa: Id de la cuenta empresa en TB asociada a esta moneda
-func (gm *GestorMonedas) Crear(credencial string, actor string, idMoneda int, idCuentaEmpresa string) (string, error) {
+// - Moneda.IdMoneda: Id de la moneda a crear (viene de MisGastos)
+// - Moneda.IdCuentaEmpresa: Id de la cuenta empresa en TB asociada a esta moneda
+func (gm *GestorMonedas) Crear(ctx context.Context, Moneda models.Monedas) (string, error) {
+	credencial, actor := auth.CredencialDesdeCtx(ctx)
 	var mensaje string
-	err := persistence.ClienteMySQL.QueryRow("CALL tsp_crear_moneda(?, ?, ?, ?)", credencial, actor, idMoneda, idCuentaEmpresa).Scan(&mensaje)
+	err := persistence.ClienteMySQL.QueryRow("CALL tsp_crear_moneda(?, ?, ?, ?)", credencial, actor, Moneda.IdMoneda, Moneda.IdCuentaEmpresa).Scan(&mensaje)
 	if err != nil {
 		return "", err
 	}
@@ -31,9 +32,9 @@ func (gm *GestorMonedas) Crear(credencial string, actor string, idMoneda int, id
 
 // Permite listar todas las monedas.
 // tsp_listar_monedas
-// - incluyeBajas: 'S' o 'N' para incluir o no las monedas bajas
-func (gm *GestorMonedas) Listar(incluyeBajas string) ([]models.Monedas, error) {
-	rows, err := persistence.ClienteMySQL.Query("CALL tsp_listar_monedas(?)", incluyeBajas)
+// - IncluyeInactivos: 'S' o 'N' para incluir o no las monedas inactivas
+func (gm *GestorMonedas) Listar(IncluyeInactivos string) ([]models.Monedas, error) {
+	rows, err := persistence.ClienteMySQL.Query("CALL tsp_listar_monedas(?)", IncluyeInactivos)
 	if err != nil {
 		return nil, err
 	}
@@ -53,19 +54,18 @@ func (gm *GestorMonedas) Listar(incluyeBajas string) ([]models.Monedas, error) {
 
 // Borra una moneda únicamente si está en estado Inactivo.
 // tsp_borrar_moneda
-// - credencial: credencial del actor que realiza la operación
-// - actor: tipo de actor ('SISTEMA' o 'USUARIO')
-// - idMoneda: Id de la moneda a borrar
-func (gm *GestorMonedas) Borrar(credencial string, actor string, idMoneda int) (string, error) {
+// - Moneda.IdMoneda: Id de la moneda a borrar
+func (gm *GestorMonedas) Borrar(ctx context.Context, Moneda models.Monedas) (string, error) {
 	// BORRAR TEST
-	if idMoneda == 901 {
+	if Moneda.IdMoneda == 901 {
 		return "", errors.New("error simulado: MySQL caido en rollback")
 	}
+	credencial, actor := auth.CredencialDesdeCtx(ctx)
 	var mensaje string
-	err := persistence.ClienteMySQL.QueryRow("CALL tsp_borrar_moneda(?, ?, ?)", credencial, actor, idMoneda).Scan(&mensaje)
+	err := persistence.ClienteMySQL.QueryRow("CALL tsp_borrar_moneda(?, ?, ?)", credencial, actor, Moneda.IdMoneda).Scan(&mensaje)
 	if err != nil {
 		return "", err
 	}
-	models.CacheMonedas.Borrar(strconv.Itoa(idMoneda))
+	models.CacheMonedas.Borrar(strconv.Itoa(Moneda.IdMoneda))
 	return mensaje, nil
 }

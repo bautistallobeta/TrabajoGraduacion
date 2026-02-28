@@ -58,7 +58,6 @@ func (n *Notificador) llamarWebhook(payload models.LoteNotificado) error {
 		return err
 	}
 	urlWebhook := n.cfg.URLWebhook
-	// TODO: si no está config la url, definir comportamiento, de momento solo se loguea la advertencia
 	if urlWebhook == "" {
 		log.Printf("ADVERTENCIA Notificador: URLWebhook no configurada. Simulación de envío exitoso:\n%s", string(jsonPayload))
 		return nil

@@ -7,9 +7,11 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"net"
 	"strconv"
 	"strings"
 	"time"
+	"unicode"
 
 	"github.com/tigerbeetle/tigerbeetle-go/pkg/types"
 )
@@ -152,6 +154,30 @@ func FechaATimestampNS(s string) (uint64, error) {
 	return uint64(t.UnixNano()), nil
 }
 
+// Valida el formato de una contraseña: mínimo 8 caracteres, al menos una mayúscula y al menos un dígito.
+func ValidarFormatoPassword(p string) error {
+	if len(p) < 8 {
+		return errors.New("la contraseña debe tener al menos 8 caracteres")
+	}
+	tieneMayuscula := false
+	tieneDigito := false
+	for _, c := range p {
+		if unicode.IsUpper(c) {
+			tieneMayuscula = true
+		}
+		if unicode.IsDigit(c) {
+			tieneDigito = true
+		}
+	}
+	if !tieneMayuscula {
+		return errors.New("la contraseña debe contener al menos una mayúscula")
+	}
+	if !tieneDigito {
+		return errors.New("la contraseña debe contener al menos un número")
+	}
+	return nil
+}
+
 // Convierte string a hash md5
 func MD5Hash(text string) string {
 	hasher := md5.New()
@@ -179,6 +205,17 @@ func MontoDecimalAUnidadMinima(monto float64) uint64 {
 	decimal = decimal[:2]
 	resultado, _ := strconv.ParseUint(entera+decimal, 10, 64)
 	return resultado
+}
+
+// SanitizarError oculta detalles de infraestructura en errores de red/conexión.
+// Para errores de red (ej: MySQL o TigerBeetle inaccesibles), devuelve un mensaje genérico.
+// Para otros errores, devuelve el mensaje original.
+func SanitizarError(err error) string {
+	var netErr *net.OpError
+	if errors.As(err, &netErr) {
+		return "No se pudo conectar al servicio de datos"
+	}
+	return err.Error()
 }
 
 // Convierte un monto en unidad mínima (centavos) almacenado en TB a string decimal con 2 cifras.

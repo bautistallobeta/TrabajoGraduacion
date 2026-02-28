@@ -6,6 +6,7 @@ import (
 	"errors"
 	"io"
 	"log"
+	"strconv"
 	"sync"
 	"time"
 
@@ -32,7 +33,7 @@ func NewConsumidor(cfg config.Config, procesador *gestores.GestorTransferencias)
 		Brokers:  cfg.BrokersKafka,
 		Topic:    cfg.TopicKafka,
 		GroupID:  cfg.GroupIDKafka,
-		MaxWait:  cfg.TimeoutLoteKafka,
+		MaxWait:  500 * time.Millisecond,
 		MinBytes: 1,
 		MaxBytes: 10e6,
 	})
@@ -49,8 +50,8 @@ func NewConsumidor(cfg config.Config, procesador *gestores.GestorTransferencias)
 func (c *Consumidor) Start() {
 	c.wg.Add(1)
 	go c.batchLoop()
-	log.Printf("Consumidor iniciado. Kafka Topic: %s, GroupID: %s, Max Batch (App): %d, Max Wait (Kafka): %s",
-		c.config.TopicKafka, c.config.GroupIDKafka, c.config.TamanoLoteKafka, c.config.TimeoutLoteKafka)
+	log.Printf("Consumidor iniciado. Kafka Topic: %s, GroupID: %s. Tamaño de lote y timeout leídos de parámetros DB (KAFKABATCHSIZE, KAFKABATCHTIMEOUTMS).",
+		c.config.TopicKafka, c.config.GroupIDKafka)
 }
 
 func (c *Consumidor) Close() {
@@ -103,7 +104,7 @@ func (c *Consumidor) procesarConRetry(
 	fallidasParseo []models.TransferenciaNotificada,
 ) error {
 	backoff := time.Second
-	maxBackoff := time.Duration(c.config.RetryMaxBackoffSeconds) * time.Second
+	maxBackoff := obtenerRetryMaxBackoff()
 
 	for {
 		err := c.procesador.ProcesarLote(transferenciasLote, kafkaMsgsLote, fallidasParseo)
@@ -136,15 +137,18 @@ func (c *Consumidor) procesarConRetry(
 
 // leer msj de kafka y armar lote de transferencias
 func (c *Consumidor) armarLoteDesdeKafka(ctx context.Context) ([]kafka.Message, []types.Transfer, []models.KafkaTransferencias, []models.TransferenciaNotificada) {
-	mensajesLote := make([]kafka.Message, 0, c.config.TamanoLoteKafka)
-	transferenciasLote := make([]types.Transfer, 0, c.config.TamanoLoteKafka)
-	kafkaMsgsLote := make([]models.KafkaTransferencias, 0, c.config.TamanoLoteKafka)
+	tamanoLote := obtenerTamanoLoteKafka()
+	timeoutLote := obtenerTimeoutLoteKafka()
+
+	mensajesLote := make([]kafka.Message, 0, tamanoLote)
+	transferenciasLote := make([]types.Transfer, 0, tamanoLote)
+	kafkaMsgsLote := make([]models.KafkaTransferencias, 0, tamanoLote)
 	var fallidasParseo []models.TransferenciaNotificada
 
-	ctxLote, cancelarLote := context.WithTimeout(ctx, c.config.TimeoutLoteKafka)
+	ctxLote, cancelarLote := context.WithTimeout(ctx, timeoutLote)
 	defer cancelarLote()
 
-	for i := 0; i < c.config.TamanoLoteKafka; i++ {
+	for i := 0; i < tamanoLote; i++ {
 		msg, err := c.reader.FetchMessage(ctxLote)
 		if err != nil {
 			if err == context.DeadlineExceeded || err == io.EOF {
@@ -244,6 +248,46 @@ func (c *Consumidor) parseKafkaMessage(msg kafka.Message) (types.Transfer, model
 		UserData32:      timeStampUint32,
 	}
 	return transferencia, kafkaMsg, nil
+}
+
+// --------------------------------------------------------------------------------
+// Helpers de parámetros DB
+// --------------------------------------------------------------------------------
+
+func obtenerTamanoLoteKafka() int {
+	p := &models.Parametros{Parametro: "KAFKABATCHSIZE"}
+	if _, err := p.Dame(); err != nil || p.Valor == "" {
+		return 1000
+	}
+	val, err := strconv.Atoi(p.Valor)
+	if err != nil || val <= 0 {
+		return 1000
+	}
+	return val
+}
+
+func obtenerTimeoutLoteKafka() time.Duration {
+	p := &models.Parametros{Parametro: "KAFKABATCHTIMEOUTMS"}
+	if _, err := p.Dame(); err != nil || p.Valor == "" {
+		return 5000 * time.Millisecond
+	}
+	val, err := strconv.Atoi(p.Valor)
+	if err != nil || val <= 0 {
+		return 5000 * time.Millisecond
+	}
+	return time.Duration(val) * time.Millisecond
+}
+
+func obtenerRetryMaxBackoff() time.Duration {
+	p := &models.Parametros{Parametro: "RETRYBACKOFFMAXSEG"}
+	if _, err := p.Dame(); err != nil || p.Valor == "" {
+		return 20 * time.Second
+	}
+	val, err := strconv.Atoi(p.Valor)
+	if err != nil || val <= 0 {
+		return 20 * time.Second
+	}
+	return time.Duration(val) * time.Second
 }
 
 // construye una transferencia de reversión a partir de la original en TigerBeetle.

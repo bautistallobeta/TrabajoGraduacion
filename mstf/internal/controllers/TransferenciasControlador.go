@@ -27,7 +27,7 @@ func (tc *TransferenciasControlador) Dame(c echo.Context) error {
 	req := &Request{}
 
 	if err := c.Bind(req); err != nil {
-		return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta("Parametros incorrectos: "+err.Error()))
+		return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta("Parametros incorrectos: "+utils.SanitizarError(err)))
 	}
 
 	if req.IdTransferencia == "" {
@@ -46,7 +46,7 @@ func (tc *TransferenciasControlador) Crear(c echo.Context) error {
 	req := new(models.KafkaTransferencias)
 
 	if err := c.Bind(req); err != nil {
-		return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta("JSON inválido o tipo de datos incorrecto: "+err.Error()))
+		return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta("JSON inválido o tipo de datos incorrecto: "+utils.SanitizarError(err)))
 	}
 
 	if req.IdTransferencia == "" {
@@ -68,7 +68,7 @@ func (tc *TransferenciasControlador) Crear(c echo.Context) error {
 	//Publish de la transferencia en Kafka
 	err := tc.Productor.PublicarTransferencia(c.Request().Context(), *req)
 	if err != nil {
-		return c.JSON(http.StatusInternalServerError, models.NewErrorRespuesta("Error al publicar en Kafka: "+err.Error()))
+		return c.JSON(http.StatusInternalServerError, models.NewErrorRespuesta("Error al publicar en Kafka: "+utils.SanitizarError(err)))
 	}
 
 	// 202 Accepted (está encolada en kafka pendiente de ser procesada)
@@ -151,7 +151,7 @@ func (tc *TransferenciasControlador) Buscar(c echo.Context) error {
 	if s := c.QueryParam("FechaDesde"); s != "" {
 		ts, err := utils.FechaATimestampNS(s)
 		if err != nil {
-			return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta("FechaDesde inválida: "+err.Error()))
+			return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta("FechaDesde inválida: "+utils.SanitizarError(err)))
 		}
 		timestampMin = ts
 	}
@@ -160,7 +160,7 @@ func (tc *TransferenciasControlador) Buscar(c echo.Context) error {
 	if s := c.QueryParam("FechaHasta"); s != "" {
 		ts, err := utils.FechaATimestampNS(s)
 		if err != nil {
-			return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta("FechaHasta inválida: "+err.Error()))
+			return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta("FechaHasta inválida: "+utils.SanitizarError(err)))
 		}
 		timestampMax = ts
 	}
@@ -180,9 +180,9 @@ func (tc *TransferenciasControlador) Buscar(c echo.Context) error {
 		limite = uint32(parsed)
 	}
 
-	transfers, err := tc.Gestor.Buscar(idsTransferencia, idUsuarioFinal, idCategoria, idMoneda, estado, montoMin, montoMax, timestampMin, timestampMax, limite)
+	transfers, err := tc.Gestor.BuscarAvanzado(idsTransferencia, idUsuarioFinal, idCategoria, idMoneda, estado, montoMin, montoMax, timestampMin, timestampMax, limite)
 	if err != nil {
-		return c.JSON(http.StatusInternalServerError, models.NewErrorRespuesta("Error al buscar transferencias: "+err.Error()))
+		return c.JSON(http.StatusInternalServerError, models.NewErrorRespuesta("Error al buscar transferencias: "+utils.SanitizarError(err)))
 	}
 
 	respuesta := make([]models.Transferencias, 0, len(transfers))

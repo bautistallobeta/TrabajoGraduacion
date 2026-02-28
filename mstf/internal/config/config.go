@@ -5,7 +5,6 @@ import (
 	"os"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/joho/godotenv"
 )
@@ -18,10 +17,6 @@ type Config struct {
 	BrokersKafka []string
 	TopicKafka   string
 	GroupIDKafka string
-	// Batching
-	TamanoLoteKafka        int
-	TimeoutLoteKafka       time.Duration
-	RetryMaxBackoffSeconds int
 	// MySQL
 	MySQLHost     string
 	MySQLPort     int
@@ -31,51 +26,52 @@ type Config struct {
 }
 
 func Load() Config {
-	//TODO: corregir los valores por defecto, que solo tome variables de .env
-	// Carga de .env (TODO: verificar el manejo de este error - diciembre 2025: no cargó el .env pero no falló
-	err := godotenv.Load()
-	if err != nil {
-		log.Printf("No se pudo cargar el archivo .env: %v", err)
+	// Carga de .env. Si no existe (ej: producción con vars de entorno del sistema), se continúa sin error.
+	if err := godotenv.Load(); err != nil {
+		log.Printf("Archivo .env no encontrado, se usarán variables de entorno del sistema: %v", err)
 	}
 
 	cfg := Config{}
 
-	cfg.Puerto = mustGetEnvInt("PORT", 8080)
+	cfg.Puerto = getEnvInt("PORT", 8080)
 
 	// TB
-	tbAddr := mustGetEnv("TB_ADDRESSES", "3000")
-	cfg.DireccionesTigerBeetle = []string{tbAddr}
+	cfg.DireccionesTigerBeetle = []string{requireEnv("TB_ADDRESSES")}
 
 	// Webhook
-	cfg.URLWebhook = mustGetEnv("WEBHOOK_URL", "")
+	cfg.URLWebhook = getEnv("WEBHOOK_URL", "")
 
-	//  Kafka
-	kafkaBrokerStr := mustGetEnv("KAFKA_BROKERS", "")
-	cfg.BrokersKafka = strings.Split(kafkaBrokerStr, ",")
-	cfg.TopicKafka = mustGetEnv("KAFKA_TOPIC_TRANSFERS", "")
-	cfg.GroupIDKafka = mustGetEnv("KAFKA_GROUP_ID", "")
-	cfg.TamanoLoteKafka = mustGetEnvInt("KAFKA_BATCH_SIZE", 1000)
-	cfg.TimeoutLoteKafka = time.Duration(mustGetEnvInt("KAFKA_BATCH_TIMEOUT_MS", 5000)) * time.Millisecond
-	cfg.RetryMaxBackoffSeconds = mustGetEnvInt("RETRY_MAX_BACKOFF_SECONDS", 20)
-
+	// Kafka
+	cfg.BrokersKafka = strings.Split(requireEnv("KAFKA_BROKERS"), ",")
+	cfg.TopicKafka = requireEnv("KAFKA_TOPIC_TRANSFERS")
+	cfg.GroupIDKafka = requireEnv("KAFKA_GROUP_ID")
 	// MySQL
-	cfg.MySQLHost = mustGetEnv("MYSQL_HOST", "")
-	cfg.MySQLPort = mustGetEnvInt("MYSQL_PORT", 3306)
-	cfg.MySQLUser = mustGetEnv("MYSQL_USER", "")
-	cfg.MySQLPassword = mustGetEnv("MYSQL_PASSWORD", "")
-	cfg.MySQLDatabase = mustGetEnv("MYSQL_DATABASE", "")
+	cfg.MySQLHost = requireEnv("MYSQL_HOST")
+	cfg.MySQLPort = getEnvInt("MYSQL_PORT", 3306)
+	cfg.MySQLUser = requireEnv("MYSQL_USER")
+	cfg.MySQLPassword = requireEnv("MYSQL_PASSWORD")
+	cfg.MySQLDatabase = requireEnv("MYSQL_DATABASE")
 
 	return cfg
 }
 
-func mustGetEnv(key string, defaultValue string) string {
+// requireEnv lee una variable de entorno requerida. Si no está definida, detiene el proceso.
+func requireEnv(key string) string {
+	value, exists := os.LookupEnv(key)
+	if !exists || value == "" {
+		log.Fatalf("FATAL: variable de entorno requerida no configurada: %s", key)
+	}
+	return value
+}
+
+func getEnv(key string, defaultValue string) string {
 	if value, exists := os.LookupEnv(key); exists {
 		return value
 	}
 	return defaultValue
 }
 
-func mustGetEnvInt(key string, defaultValue int) int {
+func getEnvInt(key string, defaultValue int) int {
 	if value, exists := os.LookupEnv(key); exists {
 		if i, err := strconv.Atoi(value); err == nil {
 			return i

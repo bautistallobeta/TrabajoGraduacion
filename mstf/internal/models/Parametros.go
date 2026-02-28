@@ -1,8 +1,10 @@
 package models
 
 import (
+	"MSTransaccionesFinancieras/internal/auth"
 	"MSTransaccionesFinancieras/internal/infra/cache"
 	"MSTransaccionesFinancieras/internal/infra/persistence"
+	"context"
 	"database/sql"
 	"time"
 )
@@ -14,7 +16,7 @@ type Parametros struct {
 	EsModificable string `json:"EsModificable"`
 }
 
-var CacheParametros = cache.NewCache[Parametros](30 * time.Minute)
+var CacheParametros = cache.NewCache[Parametros](5 * time.Minute)
 
 // Devuelve los datos de un parámetro específico por su clave.
 // tsp_dame_parametro
@@ -67,8 +69,8 @@ func (p *Parametros) Dame() (string, error) {
 
 // Permite buscar los parámetros del sistema según su nombre.
 // tsp_buscar_parametros
-func (p *Parametros) BuscarParametros(cadena string) ([]Parametros, error) {
-	rows, err := persistence.ClienteMySQL.Query("CALL tsp_buscar_parametros(?, ?)", cadena, "N")
+func (p *Parametros) BuscarParametros(Cadena string) ([]Parametros, error) {
+	rows, err := persistence.ClienteMySQL.Query("CALL tsp_buscar_parametros(?, ?)", Cadena, "N")
 	if err != nil {
 		return nil, err
 	}
@@ -88,12 +90,11 @@ func (p *Parametros) BuscarParametros(cadena string) ([]Parametros, error) {
 
 // Permite modificar el valor de un parámetro siempre y cuando exista y sea modificable.
 // tsp_modificar_parametro
-// - credencial: credencial del actor que realiza la operación (para auditoría)
-// - actor: tipo de actor ('SISTEMA' o 'USUARIO') (para auditoría)
 // - valor: nuevo valor del parámetro
-func (p *Parametros) ModificarParametro(credencial string, actor string, valor string) (string, error) {
+func (p *Parametros) ModificarParametro(ctx context.Context, Valor string) (string, error) {
+	credencial, actor := auth.CredencialDesdeCtx(ctx)
 	var mensaje string
-	err := persistence.ClienteMySQL.QueryRow("CALL tsp_modificar_parametro(?, ?, ?, ?)", credencial, actor, p.Parametro, valor).Scan(&mensaje)
+	err := persistence.ClienteMySQL.QueryRow("CALL tsp_modificar_parametro(?, ?, ?, ?)", credencial, actor, p.Parametro, Valor).Scan(&mensaje)
 	if err != nil {
 		return "", err
 	}

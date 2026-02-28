@@ -1,8 +1,8 @@
 package controllers
 
 import (
-	httpMiddleware "MSTransaccionesFinancieras/internal/http/middlewares"
 	"MSTransaccionesFinancieras/internal/models"
+	"MSTransaccionesFinancieras/internal/utils"
 	"net/http"
 
 	"github.com/labstack/echo/v4"
@@ -21,7 +21,7 @@ func (pc *ParametrosControlador) Dame(c echo.Context) error {
 	}
 	req := &Request{}
 	if err := c.Bind(req); err != nil {
-		return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta("Parámetros inválidos: "+err.Error()))
+		return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta("Parámetros inválidos: "+utils.SanitizarError(err)))
 	}
 	if req.Parametro == "" {
 		return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta("Parámetro es campo obligatorio"))
@@ -32,7 +32,7 @@ func (pc *ParametrosControlador) Dame(c echo.Context) error {
 		return c.JSON(http.StatusNotFound, models.NewErrorRespuesta(mensaje))
 	}
 	if err != nil {
-		return c.JSON(http.StatusInternalServerError, models.NewErrorRespuesta("Error al obtener parámetro: "+err.Error()))
+		return c.JSON(http.StatusInternalServerError, models.NewErrorRespuesta("Error al obtener parámetro: "+utils.SanitizarError(err)))
 	}
 
 	return c.JSON(http.StatusOK, param)
@@ -43,11 +43,9 @@ func (pc *ParametrosControlador) Modificar(c echo.Context) error {
 		Parametro string `param:"Parametro"`
 		Valor     string `json:"Valor"`
 	}
-	credencial, _ := c.Get(httpMiddleware.ClaveCredencial).(string)
-	actor, _ := c.Get(httpMiddleware.ClaveActor).(string)
 	req := &Request{}
 	if err := c.Bind(req); err != nil {
-		return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta("Parámetros inválidos: "+err.Error()))
+		return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta("Parámetros inválidos: "+utils.SanitizarError(err)))
 	}
 	if req.Parametro == "" {
 		return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta("Parámetro es campo obligatorio"))
@@ -56,9 +54,9 @@ func (pc *ParametrosControlador) Modificar(c echo.Context) error {
 		return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta("Valor es campo obligatorio"))
 	}
 	param := &models.Parametros{Parametro: req.Parametro}
-	mensaje, err := param.ModificarParametro(credencial, actor, req.Valor)
+	mensaje, err := param.ModificarParametro(c.Request().Context(), req.Valor)
 	if err != nil {
-		return c.JSON(http.StatusInternalServerError, models.NewErrorRespuesta("Error al modificar parámetro: "+err.Error()))
+		return c.JSON(http.StatusInternalServerError, models.NewErrorRespuesta("Error al modificar parámetro: "+utils.SanitizarError(err)))
 	}
 	if mensaje != "OK" {
 		return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta(mensaje))
@@ -72,12 +70,12 @@ func (pc *ParametrosControlador) Buscar(c echo.Context) error {
 	}
 	req := &Request{}
 	if err := c.Bind(req); err != nil {
-		return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta("Parámetros inválidos: "+err.Error()))
+		return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta("Parámetros inválidos: "+utils.SanitizarError(err)))
 	}
 	param := &models.Parametros{}
 	parametros, err := param.BuscarParametros(req.Cadena)
 	if err != nil {
-		return c.JSON(http.StatusInternalServerError, models.NewErrorRespuesta("Error al buscar parámetros: "+err.Error()))
+		return c.JSON(http.StatusInternalServerError, models.NewErrorRespuesta("Error al buscar parámetros: "+utils.SanitizarError(err)))
 	}
 	return c.JSON(http.StatusOK, parametros)
 }

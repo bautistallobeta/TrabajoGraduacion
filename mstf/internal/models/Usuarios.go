@@ -1,7 +1,9 @@
 package models
 
 import (
+	"MSTransaccionesFinancieras/internal/auth"
 	"MSTransaccionesFinancieras/internal/infra/persistence"
+	"context"
 	"database/sql"
 	"errors"
 )
@@ -55,8 +57,8 @@ func (u *Usuarios) Dame() (string, error) {
 // tsp_login_usuario
 // - usuario: nombre de usuario que intenta iniciar sesión
 // - password: contraseña hasheada con md5 del usuario que intenta iniciar sesión
-func (u *Usuarios) Login(usuario string, password string) (string, string, error) {
-	rows, err := persistence.ClienteMySQL.Query("CALL tsp_login_usuario(?, ?)", usuario, password)
+func (u *Usuarios) Login(Usuario string, Password string) (string, string, error) {
+	rows, err := persistence.ClienteMySQL.Query("CALL tsp_login_usuario(?, ?)", Usuario, Password)
 	if err != nil {
 		return "", "", err
 	}
@@ -107,19 +109,21 @@ func (u *Usuarios) Login(usuario string, password string) (string, string, error
 	return "", "", errors.New("Error: intente nuevamente o contacte al administrador")
 }
 
-// Permite cambiar el estado de un usuario a A: Activo siempre y cuando esté dado de baja.
+// Permite cambiar el estado de un usuario a A: Activo siempre y cuando esté inactivo.
 // tsp_activar_usuario
-func (u *Usuarios) Activar() (string, error) {
+func (u *Usuarios) Activar(ctx context.Context) (string, error) {
+	credencial, actor := auth.CredencialDesdeCtx(ctx)
 	var mensaje string
-	err := persistence.ClienteMySQL.QueryRow("CALL tsp_activar_usuario(?)", u.IdUsuario).Scan(&mensaje)
+	err := persistence.ClienteMySQL.QueryRow("CALL tsp_activar_usuario(?, ?, ?)", u.IdUsuario, credencial, actor).Scan(&mensaje)
 	return mensaje, err
 }
 
-// Permite cambiar el estado de un usuario a I: Inactivo siempre y cuando no esté desactivado.
+// Permite cambiar el estado de un usuario a I: Inactivo siempre y cuando esté activo.
 // tsp_desactivar_usuario
-func (u *Usuarios) Desactivar() (string, error) {
+func (u *Usuarios) Desactivar(ctx context.Context) (string, error) {
+	credencial, actor := auth.CredencialDesdeCtx(ctx)
 	var mensaje string
-	err := persistence.ClienteMySQL.QueryRow("CALL tsp_desactivar_usuario(?)", u.IdUsuario).Scan(&mensaje)
+	err := persistence.ClienteMySQL.QueryRow("CALL tsp_desactivar_usuario(?, ?, ?)", u.IdUsuario, credencial, actor).Scan(&mensaje)
 	return mensaje, err
 }
 
@@ -128,8 +132,9 @@ func (u *Usuarios) Desactivar() (string, error) {
 // - credencial: token de sesión del usuario (para identificarlo en el SP)
 // - password: contraseña hasheada con md5
 // - confirmarPassword: confirmación de la contraseña hasheada con md5
-func (u *Usuarios) ConfirmarCuenta(credencial string, password string, confirmarPassword string) (string, error) {
+func (u *Usuarios) ConfirmarCuenta(ctx context.Context, Password string, ConfirmarPassword string) (string, error) {
+	credencial, _ := auth.CredencialDesdeCtx(ctx)
 	var mensaje string
-	err := persistence.ClienteMySQL.QueryRow("CALL tsp_confirmar_cuenta_usuario(?, ?, ?)", credencial, password, confirmarPassword).Scan(&mensaje)
+	err := persistence.ClienteMySQL.QueryRow("CALL tsp_confirmar_cuenta_usuario(?, ?, ?)", credencial, Password, ConfirmarPassword).Scan(&mensaje)
 	return mensaje, err
 }

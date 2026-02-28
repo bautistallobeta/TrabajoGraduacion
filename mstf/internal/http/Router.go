@@ -1,6 +1,8 @@
 package http
 
 import (
+	"strings"
+
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 
@@ -22,7 +24,9 @@ func InitRouter(notificador *webhook.Notificador, productor *kafkamstf.Productor
 		middleware.CORS(),
 		httpMiddleware.AutenticacionDual(func(c echo.Context) bool {
 			path := c.Request().URL.Path
-			return path == "/ping" || path == "/usuarios/login"
+			// confirmar-cuenta usa token de sesión Estado=P; el SP valida internamente.
+			return path == "/ping" || path == "/usuarios/login" ||
+				strings.HasPrefix(path, "/usuarios/confirmar-cuenta/")
 		}),
 	)
 
@@ -49,6 +53,7 @@ func initRoutes(router *echo.Echo, notificador *webhook.Notificador, productor *
 
 	// Cuentas
 	router.GET("/cuentas/:idusuariofinal/:idmoneda/historial", cuentasControlador.DameHistorial)
+	router.GET("/cuentas/:idusuariofinal/:idmoneda/transferencias", cuentasControlador.DameTransferencias)
 	router.GET("/cuentas/:idusuariofinal/:idmoneda", cuentasControlador.Dame)
 	router.POST("/cuentas", cuentasControlador.Crear)
 	router.GET("/cuentas", cuentasControlador.Buscar)
@@ -84,5 +89,4 @@ func initRoutes(router *echo.Echo, notificador *webhook.Notificador, productor *
 	router.GET("/monedas", monedasControlador.Listar)
 	router.PUT("/monedas/:idmoneda/desactivar", monedasControlador.Desactivar)
 	router.PUT("/monedas/:idmoneda/activar", monedasControlador.Activar)
-
 }
