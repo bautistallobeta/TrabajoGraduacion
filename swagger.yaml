@@ -2,17 +2,13 @@ openapi: 3.0.3
 info:
   title: MSTF - Microservicio de Transacciones Financieras
   description: |
-    API REST para gestión de cuentas y transferencias financieras utilizando TigerBeetle como base de datos.
+    API REST para gestión de cuentas y transferencias financieras sobre TigerBeetle como ledger y MySQL para datos administrativos.
 
-    **Arquitectura:**
-    - Transferencias procesadas de forma asíncrona mediante Kafka
-    - Notificaciones síncronas vía Webhook
-    - Historial de balances habilitado para todas las cuentas
+    **Autenticación:** la mayoría de los endpoints requieren credenciales. Se aceptan dos esquemas:
+    - `Bearer <token>` — actor USUARIO (token de sesión obtenido en `/usuarios/login`)
+    - `X-API-Key: <apikey>` — actor SISTEMA
 
-    **Notas importantes:**
-    - Todos los IDs son Uint128 representados como strings decimales
-    - Las transferencias se procesan en lotes (batching)
-    - El estado de una cuenta puede ser "A" (activa) o "I" (inactiva/cerrada)
+    Endpoints públicos (sin autenticación): `GET /ping`, `POST /usuarios/login`
   version: 1.0.0
   contact:
     name: Bautista José Llobeta
@@ -23,589 +19,1548 @@ servers:
 
 tags:
   - name: Health
-    description: Endpoints de salud del servicio
-  - name: Cuentas
-    description: Operaciones sobre cuentas financieras
   - name: Transferencias
-    description: Operaciones sobre transferencias financieras
+  - name: Cuentas
+  - name: Monedas
+  - name: Parámetros
+  - name: Usuarios
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      description: Token de sesión obtenido en POST /usuarios/login
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+      description: API key para actores SISTEMA
+
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+          example: "mensaje de error descriptivo"
+
+    Cuenta:
+      type: object
+      properties:
+        IdCuenta:
+          type: string
+          description: ID compuesto (Uint128 decimal)
+          example: "1000000000012345"
+        IdUsuarioFinal:
+          type: integer
+          example: 12345
+        IdMoneda:
+          type: integer
+          example: 1
+        Creditos:
+          type: string
+          description: Créditos posteados (con decimales)
+          example: "500.00"
+        Debitos:
+          type: string
+          description: Débitos posteados (con decimales)
+          example: "200.00"
+        Estado:
+          type: string
+          enum: [A, I]
+          description: A=Activa, I=Inactiva
+          example: "A"
+        Fecha:
+          type: string
+          description: Fecha de alta ingresada al crear la cuenta
+          example: "2025-01-15"
+        FechaProceso:
+          type: string
+          description: Timestamp de registro en TigerBeetle (nanosegundos)
+          example: "2025-01-15 10:30:00.123456789"
+
+    Transferencia:
+      type: object
+      properties:
+        IdTransferencia:
+          type: string
+          example: "98765432100000000001"
+        IdCuentaDebito:
+          type: string
+          example: "1000000000012345"
+        IdCuentaCredito:
+          type: string
+          example: "1000000000000000"
+        IdUsuarioFinal:
+          type: integer
+          example: 12345
+        IdMoneda:
+          type: integer
+          example: 1
+        Monto:
+          type: string
+          description: Monto con dos decimales
+          example: "150.00"
+        Tipo:
+          type: string
+          enum: [I, E, R]
+          description: I=Ingreso, E=Egreso, R=Reversión
+          example: "I"
+        Categoria:
+          type: integer
+          example: 10
+        Fecha:
+          type: string
+          description: Fecha de negocio
+          example: "2025-01-15"
+        FechaProceso:
+          type: string
+          description: Timestamp de procesamiento en TigerBeetle
+          example: "2025-01-15 10:30:00.123456789"
+        Estado:
+          type: string
+          enum: [F, R]
+          description: F=Finalizada, R=Revertida
+          example: "F"
+        IdTransferenciaOriginal:
+          type: string
+          description: Solo presente en reversiones
+          example: "98765432100000000001"
+
+    Moneda:
+      type: object
+      properties:
+        IdMoneda:
+          type: integer
+          example: 1
+        IdCuentaEmpresa:
+          type: string
+          description: ID de la cuenta empresa en TigerBeetle para este ledger
+          example: "1000000000000000"
+        Estado:
+          type: string
+          enum: [A, I]
+          example: "A"
+        FechaAlta:
+          type: string
+          example: "2025-01-01T00:00:00Z"
+
+    Parametro:
+      type: object
+      properties:
+        Parametro:
+          type: string
+          example: "LIMITEBUSCARCUENTAS"
+        Valor:
+          type: string
+          example: "100"
+        Descripcion:
+          type: string
+          example: "Límite por defecto para búsqueda de cuentas"
+        EsModificable:
+          type: string
+          enum: [S, N]
+          example: "S"
+
+    Usuario:
+      type: object
+      properties:
+        IdUsuario:
+          type: integer
+          example: 7
+        Usuario:
+          type: string
+          example: "juan.perez"
+        Estado:
+          type: string
+          enum: [P, A, I]
+          description: P=Pendiente, A=Activo, I=Inactivo
+          example: "A"
+        FechaAlta:
+          type: string
+          example: "2025-01-10"
+        TokenSesion:
+          type: string
+          example: "abc123token"
+        RequiereCambioPassword:
+          type: string
+          enum: [S, N]
+          example: "N"
+
+security:
+  - BearerAuth: []
+  - ApiKeyAuth: []
 
 paths:
-  /hola:
+
+  # ── HEALTH ─────────────────────────────────────────────────────────────────
+
+  /ping:
     get:
-      tags:
-        - Health
-      summary: Health check del servicio
-      description: Verifica que el servicio esté funcionando correctamente
-      operationId: healthCheck
+      tags: [Health]
+      summary: Health check
+      security: []
       responses:
         '200':
-          description: Servicio funcionando correctamente
+          description: Servicio activo
           content:
             text/plain:
               schema:
                 type: string
-                example: "Hola Mundo desde API MSTF."
+                example: "pong"
 
-  /cuentas/{id_cuenta}:
+  # ── TRANSFERENCIAS ─────────────────────────────────────────────────────────
+
+  /transferencias/{idtransferencia}:
     get:
-      tags:
-        - Cuentas
-      summary: Obtener cuenta por ID
-      description: Recupera la información completa de una cuenta específica por su ID
-      operationId: getCuenta
+      tags: [Transferencias]
+      summary: Obtener transferencia por ID
       parameters:
-        - name: id_cuenta
+        - name: idtransferencia
           in: path
           required: true
-          description: ID de la cuenta (Uint128 en formato decimal string)
+          description: ID de la transferencia (Uint128 decimal string)
           schema:
             type: string
-          example: "100000000000000000001"
+          example: "98765432100000000001"
       responses:
         '200':
-          description: Cuenta encontrada exitosamente
+          description: Transferencia encontrada
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Cuenta'
+                $ref: '#/components/schemas/Transferencia'
         '400':
-          description: ID de cuenta inválido o formato incorrecto
+          description: ID inválido
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorRespuesta'
-              example:
-                error: "IdCuenta formato incorrecto"
+                $ref: '#/components/schemas/Error'
         '404':
-          description: Cuenta no encontrada
+          description: No encontrada
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorRespuesta'
-              example:
-                error: "Cuenta no encontrada en TigerBeetle"
+                $ref: '#/components/schemas/Error'
 
-  /cuentas/{id_cuenta}/historial:
+  /transferencias:
     get:
-      tags:
-        - Cuentas
-      summary: Obtener historial de balances de una cuenta
+      tags: [Transferencias]
+      summary: Buscar transferencias con filtros
       description: |
-        Recupera el historial de balances de una cuenta a lo largo del tiempo.
-        Cada entrada representa el estado del balance después de una transferencia.
-
-        **Nota:** Este endpoint requiere que la cuenta tenga el flag `History` activado (se activa automáticamente en todas las cuentas nuevas).
-      operationId: getHistorialCuenta
+        Si se envía `IdsTransferencia` (parámetro repetido), hace lookup directo ignorando el resto de filtros.
+        De lo contrario aplica los filtros disponibles.
+        `FechaDesde`/`FechaHasta` filtran por timestamp de procesamiento en TigerBeetle, no por fecha de negocio.
       parameters:
-        - name: id_cuenta
-          in: path
-          required: true
-          description: ID de la cuenta (Uint128 en formato decimal string)
+        - name: IdsTransferencia
+          in: query
+          description: "IDs para lookup directo. Parámetro repetido: ?IdsTransferencia=1&IdsTransferencia=2"
+          schema:
+            type: array
+            items:
+              type: string
+          style: form
+          explode: true
+        - name: IdUsuarioFinal
+          in: query
+          schema:
+            type: integer
+          description: "0 o vacío = sin filtro"
+        - name: IdCategoria
+          in: query
+          schema:
+            type: integer
+          description: "0 o vacío = sin filtro"
+        - name: IdMoneda
+          in: query
+          schema:
+            type: integer
+          description: "0 o vacío = sin filtro"
+        - name: Estado
+          in: query
           schema:
             type: string
-          example: "100000000000000000001"
-        - name: timestamp_min
+            enum: [F, R, '']
+          description: "F=Finalizada, R=Revertida, vacío=sin filtro"
+        - name: MontoMin
           in: query
-          required: false
-          description: Timestamp mínimo (nanosegundos desde epoch). 0 o vacío = sin filtro
+          schema:
+            type: number
+          description: "Monto mínimo decimal inclusive. 0 o vacío = sin filtro"
+          example: 10.50
+        - name: MontoMax
+          in: query
+          schema:
+            type: number
+          description: "Monto máximo decimal inclusive. 0 o vacío = sin filtro"
+          example: 500.00
+        - name: FechaDesde
+          in: query
+          schema:
+            type: string
+          description: "Formatos: YYYY-MM-DD, YYYY-MM-DD HH:MM:SS, RFC3339"
+          example: "2025-01-01"
+        - name: FechaHasta
+          in: query
+          schema:
+            type: string
+          example: "2025-12-31"
+        - name: Limite
+          in: query
           schema:
             type: integer
-            format: uint64
-            default: 0
-          example: 1704067200000000000
-        - name: timestamp_max
-          in: query
-          required: false
-          description: Timestamp máximo (nanosegundos desde epoch). 0 o vacío = sin filtro
-          schema:
-            type: integer
-            format: uint64
-            default: 0
-          example: 1704153600000000000
-        - name: limite
-          in: query
-          required: false
-          description: Número máximo de registros a retornar
-          schema:
-            type: integer
-            format: uint32
+            minimum: 1
+            maximum: 500
             default: 100
-          example: 50
       responses:
         '200':
-          description: Historial obtenido exitosamente
+          description: Resultado (puede ser vacío)
           content:
             application/json:
               schema:
                 type: object
                 properties:
-                  id_cuenta:
-                    type: string
-                    description: ID de la cuenta consultada
-                    example: "100000000000000000001"
-                  total:
+                  Total:
                     type: integer
-                    description: Cantidad de registros en el historial
-                    example: 3
-                  historial:
+                    example: 2
+                  Transferencias:
                     type: array
                     items:
-                      $ref: '#/components/schemas/BalanceHistorial'
+                      $ref: '#/components/schemas/Transferencia'
         '400':
           description: Parámetros inválidos
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorRespuesta'
-              example:
-                error: "Parámetro 'timestamp_min' inválido"
-        '404':
-          description: Cuenta no encontrada
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorRespuesta'
+                $ref: '#/components/schemas/Error'
         '500':
-          description: Error interno al obtener historial
+          description: Error interno
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorRespuesta'
-
-  /cuentas:
-    get:
-      tags:
-        - Cuentas
-      summary: Buscar cuentas con filtros
-      description: |
-        Busca cuentas aplicando filtros opcionales.
-
-        **Filtros disponibles:**
-        - Por usuario final (id_usuario_final)
-        - Por ledger (id_ledger)
-        - Por tipo de cuenta (tipo)
-        - Por estado (estado: "A" o "I")
-
-        **Notas:**
-        - Valores 0 o vacíos deshabilitan ese filtro específico
-        - El parámetro `limit` controla el máximo total de resultados retornados
-        - Si hay más resultados disponibles que el límite, solo se retornan los primeros N
-      operationId: buscarCuentas
-      parameters:
-        - name: id_usuario_final
-          in: query
-          required: false
-          description: Filtrar por ID de usuario final. 0 o vacío = sin filtro
-          schema:
-            type: integer
-            format: uint64
-            default: 0
-          example: 12345
-        - name: id_ledger
-          in: query
-          required: false
-          description: Filtrar por ID de ledger. 0 o vacío = sin filtro
-          schema:
-            type: integer
-            format: uint32
-            default: 0
-          example: 1
-        - name: tipo
-          in: query
-          required: false
-          description: Filtrar por tipo de cuenta (code). 0 o vacío = sin filtro
-          schema:
-            type: integer
-            format: uint16
-            default: 0
-          example: 1
-        - name: estado
-          in: query
-          required: false
-          description: 'Filtrar por estado: "A" (activo), "I" (inactivo), vacío = sin filtro'
-          schema:
-            type: string
-            enum: ['A', 'I', '']
-            default: ''
-          example: "A"
-        - name: limit
-          in: query
-          required: false
-          description: Número máximo total de resultados a retornar
-          schema:
-            type: integer
-            format: uint32
-            minimum: 1
-            maximum: 500
-            default: 100
-          example: 100
-      responses:
-        '200':
-          description: Búsqueda exitosa (puede retornar array vacío si no hay coincidencias)
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  total:
-                    type: integer
-                    description: Cantidad total de cuentas encontradas
-                    example: 2
-                  cuentas:
-                    type: array
-                    items:
-                      $ref: '#/components/schemas/Cuenta'
-        '400':
-          description: Parámetros de búsqueda inválidos
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorRespuesta'
-              examples:
-                invalidLimit:
-                  value:
-                    error: "limit no puede ser mayor a 500"
-                invalidEstado:
-                  value:
-                    error: "estado debe ser 'A' (activo), 'I' (inactivo), o vacío"
-        '500':
-          description: Error interno al buscar cuentas
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorRespuesta'
+                $ref: '#/components/schemas/Error'
 
     post:
-      tags:
-        - Cuentas
-      summary: Crear nueva cuenta
+      tags: [Transferencias]
+      summary: "Crear transferencia — SOLO PARA PRUEBAS"
       description: |
-        Crea una nueva cuenta en TigerBeetle con los siguientes flags automáticos:
-        - `DebitsMustNotExceedCredits`: true (previene saldo negativo)
-        - `History`: true (habilita historial de balances)
+        **Este endpoint existe únicamente para probar el microservicio.**
+        Publica un mensaje en Kafka para que el consumidor lo procese de forma asíncrona.
+        Retorna 202 inmediatamente; el resultado real llega vía Webhook al completarse el lote.
 
-        El ID de la cuenta se genera automáticamente concatenando ledger y usuario final.
-      operationId: crearCuenta
+        Tipos:
+        - `I` — Ingreso (empresa → usuario)
+        - `E` — Egreso (usuario → empresa)
+        - `R` — Reversión (requiere `IdTransferencia` de la transfer original, `Monto` puede ser 0)
       requestBody:
         required: true
         content:
           application/json:
             schema:
               type: object
-              required:
-                - id_usuario_final
-                - id_ledger
-                - fecha_alta
+              required: [IdTransferencia, IdUsuarioFinal, IdMoneda, Tipo, IdCategoria, Fecha]
               properties:
-                id_usuario_final:
-                  type: integer
-                  format: uint64
-                  description: ID del usuario propietario de la cuenta
-                  example: 12345
-                id_ledger:
-                  type: integer
-                  format: uint32
-                  description: ID del ledger al que pertenece la cuenta
-                  example: 1
-                fecha_alta:
+                IdTransferencia:
                   type: string
-                  description: Fecha de alta de la cuenta (formato timestamp o fecha)
-                  example: "2024-01-01 10:00:00"
+                  description: ID único (Uint128 decimal string)
+                  example: "98765432100000000001"
+                IdUsuarioFinal:
+                  type: integer
+                  example: 12345
+                Monto:
+                  type: number
+                  description: Decimal. Requerido y > 0 para Tipo I o E.
+                  example: 150.50
+                IdMoneda:
+                  type: integer
+                  example: 1
+                Tipo:
+                  type: string
+                  enum: [I, E, R]
+                  example: "I"
+                IdCategoria:
+                  type: integer
+                  example: 10
+                Fecha:
+                  type: string
+                  description: Fecha de negocio
+                  example: "2025-06-15"
+            example:
+              IdTransferencia: "98765432100000000001"
+              IdUsuarioFinal: 12345
+              Monto: 150.50
+              IdMoneda: 1
+              Tipo: "I"
+              IdCategoria: 10
+              Fecha: "2025-06-15"
       responses:
-        '201':
-          description: Cuenta creada exitosamente
+        '202':
+          description: Encolada en Kafka
           content:
             application/json:
               schema:
                 type: object
                 properties:
-                  status:
+                  Mensaje:
                     type: string
-                    example: "OK: Cuenta creada exitosamente"
-                  id:
+                    example: "Transferencia aceptada y encolada en Kafka."
+                  Id:
                     type: string
-                    description: ID de la cuenta creada (Uint128 en formato decimal)
-                    example: "100000000000000012345"
+                    example: "98765432100000000001"
         '400':
-          description: Datos de entrada inválidos o faltantes
+          description: Datos inválidos
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorRespuesta'
-              examples:
-                camposFaltantes:
-                  value:
-                    error: "Faltan campos requeridos: id_usuario_final, id_ledger"
-                jsonInvalido:
-                  value:
-                    error: "JSON inválido o tipo de datos incorrecto"
-        '409':
-          description: Error al crear la cuenta (posible duplicado o error de TigerBeetle)
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Error publicando en Kafka
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorRespuesta'
-              example:
-                error: "Error al crear cuenta: exists"
+                $ref: '#/components/schemas/Error'
 
-  /transferencias/{id_transferencia}:
+  # ── CUENTAS ────────────────────────────────────────────────────────────────
+
+  /cuentas/{idusuariofinal}/{idmoneda}:
     get:
-      tags:
-        - Transferencias
-      summary: Obtener transferencia por ID
-      description: Recupera la información completa de una transferencia específica por su ID
-      operationId: getTransferencia
+      tags: [Cuentas]
+      summary: Obtener cuenta de un usuario en una moneda
       parameters:
-        - name: id_transferencia
+        - name: idusuariofinal
           in: path
           required: true
-          description: ID de la transferencia (Uint128 en formato decimal string)
           schema:
-            type: string
-          example: "200000000000000000001"
+            type: integer
+          example: 12345
+        - name: idmoneda
+          in: path
+          required: true
+          schema:
+            type: integer
+          example: 1
       responses:
         '200':
-          description: Transferencia encontrada exitosamente
+          description: Cuenta encontrada
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Transferencia'
+                $ref: '#/components/schemas/Cuenta'
         '400':
-          description: ID de transferencia inválido
+          description: Parámetros inválidos o cuenta no encontrada
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorRespuesta'
-        '404':
-          description: Transferencia no encontrada
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorRespuesta'
-              example:
-                error: "Transferencia no encontrada"
+                $ref: '#/components/schemas/Error'
 
-  /transferencias:
+  /cuentas/{idusuariofinal}/{idmoneda}/historial:
+    get:
+      tags: [Cuentas]
+      summary: Historial de balances de la cuenta
+      description: Devuelve el balance de la cuenta en cada momento en que fue afectada por una transferencia.
+      parameters:
+        - name: idusuariofinal
+          in: path
+          required: true
+          schema:
+            type: integer
+          example: 12345
+        - name: idmoneda
+          in: path
+          required: true
+          schema:
+            type: integer
+          example: 1
+        - name: TimeStampMin
+          in: query
+          schema:
+            type: integer
+          description: Timestamp mínimo en nanosegundos. 0 o vacío = sin filtro.
+          example: 1735689600000000000
+        - name: TimeStampMax
+          in: query
+          schema:
+            type: integer
+          description: Timestamp máximo en nanosegundos. 0 o vacío = sin filtro.
+          example: 1767225600000000000
+        - name: Limite
+          in: query
+          schema:
+            type: integer
+            default: 0
+          description: Máximo de registros. 0 = sin límite.
+      responses:
+        '200':
+          description: Historial obtenido
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  IdUsuarioFinal:
+                    type: integer
+                    example: 12345
+                  IdMoneda:
+                    type: integer
+                    example: 1
+                  Total:
+                    type: integer
+                    example: 3
+                  Historial:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        Debitos:
+                          type: string
+                          example: "100.00"
+                        Creditos:
+                          type: string
+                          example: "500.00"
+                        Balance:
+                          type: string
+                          example: "400.00"
+                        Timestamp:
+                          type: integer
+                          example: 1735689600123456789
+        '400':
+          description: Parámetros inválidos
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Error interno
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /cuentas/{idusuariofinal}/{idmoneda}/transferencias:
+    get:
+      tags: [Cuentas]
+      summary: Transferencias de la cuenta
+      description: Devuelve las transferencias asociadas a la cuenta. Excluye las de cierre internas.
+      parameters:
+        - name: idusuariofinal
+          in: path
+          required: true
+          schema:
+            type: integer
+          example: 12345
+        - name: idmoneda
+          in: path
+          required: true
+          schema:
+            type: integer
+          example: 1
+        - name: TimestampMin
+          in: query
+          schema:
+            type: integer
+          description: Timestamp mínimo en nanosegundos. 0 o vacío = sin filtro.
+        - name: TimestampMax
+          in: query
+          schema:
+            type: integer
+          description: Timestamp máximo en nanosegundos. 0 o vacío = sin filtro.
+        - name: Limite
+          in: query
+          schema:
+            type: integer
+            default: 0
+          description: Máximo de registros. 0 = sin límite.
+      responses:
+        '200':
+          description: Transferencias de la cuenta
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  Total:
+                    type: integer
+                    example: 5
+                  Transferencias:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Transferencia'
+        '400':
+          description: Parámetros inválidos
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Error interno
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /cuentas:
     post:
-      tags:
-        - Transferencias
-      summary: Crear nueva transferencia (asíncrono)
-      description: |
-        Crea una nueva transferencia enviándola a la cola de Kafka para procesamiento asíncrono.
-
-        **Flujo de procesamiento:**
-        1. La transferencia se valida y se publica en Kafka
-        2. El consumidor la procesa en lotes (batching)
-        3. Se ejecuta en TigerBeetle
-        4. Se envía notificación vía Webhook
-        5. Se hace commit en Kafka solo si todo fue exitoso
-
-        **Importante:** Este endpoint retorna 202 Accepted inmediatamente. El procesamiento real ocurre de forma asíncrona.
-      operationId: crearTransferencia
+      tags: [Cuentas]
+      summary: Crear cuenta
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/CrearTransferenciaRequest'
+              type: object
+              required: [IdUsuarioFinal, IdMoneda, Fecha]
+              properties:
+                IdUsuarioFinal:
+                  type: integer
+                  example: 12345
+                IdMoneda:
+                  type: integer
+                  example: 1
+                Fecha:
+                  type: string
+                  description: Fecha de alta
+                  example: "2025-06-15"
+            example:
+              IdUsuarioFinal: 12345
+              IdMoneda: 1
+              Fecha: "2025-06-15"
       responses:
-        '202':
-          description: Transferencia aceptada y encolada en Kafka para procesamiento
+        '201':
+          description: Cuenta creada
           content:
             application/json:
               schema:
                 type: object
                 properties:
-                  mensaje:
+                  Mensaje:
                     type: string
-                    example: "Transferencia aceptada y encolada en Kafka."
-                  id:
+                    example: "Cuenta creada exitosamente"
+        '200':
+          description: Cuenta ya existía
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  Mensaje:
                     type: string
-                    description: ID de la transferencia aceptada
-                    example: "200000000000000000001"
+                    example: "Cuenta ya existente"
         '400':
-          description: Datos de entrada inválidos
+          description: Datos inválidos
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorRespuesta'
-              examples:
-                montoInvalido:
-                  value:
-                    error: "Monto debe ser mayor a cero"
-                camposFaltantes:
-                  value:
-                    error: "IdTransferencia, IdCuentaDebito e IdCuentaCredito son obligatorios"
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Error al crear en TigerBeetle
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+    get:
+      tags: [Cuentas]
+      summary: Buscar cuentas con filtros
+      description: |
+        **Modo lookup directo:** si se envían `IdsUsuarioFinal` e `IdsMoneda` (arrays paralelos del mismo tamaño),
+        hace lookup por esos pares ignorando el resto de filtros.
+
+        **Modo filtrado:** usa `IdUsuarioFinal`, `IdMoneda`, `Estado` y `Limite`.
+      parameters:
+        - name: IdsUsuarioFinal
+          in: query
+          description: "Array de IDs de usuario. Debe tener la misma cantidad que IdsMoneda. ?IdsUsuarioFinal=1&IdsUsuarioFinal=2"
+          schema:
+            type: array
+            items:
+              type: integer
+          style: form
+          explode: true
+        - name: IdsMoneda
+          in: query
+          description: "Array de IDs de moneda, paralelo a IdsUsuarioFinal. ?IdsMoneda=1&IdsMoneda=1"
+          schema:
+            type: array
+            items:
+              type: integer
+          style: form
+          explode: true
+        - name: IdUsuarioFinal
+          in: query
+          schema:
+            type: integer
+          description: "0 o vacío = sin filtro"
+        - name: IdMoneda
+          in: query
+          schema:
+            type: integer
+          description: "0 o vacío = sin filtro"
+        - name: Estado
+          in: query
+          schema:
+            type: string
+            enum: [A, I, '']
+          description: "A=Activa, I=Inactiva, vacío=sin filtro"
+        - name: Limite
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 500
+            default: 100
+      responses:
+        '200':
+          description: Resultado (puede ser vacío)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  Total:
+                    type: integer
+                    example: 2
+                  Cuentas:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Cuenta'
+        '400':
+          description: Parámetros inválidos
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
         '500':
-          description: Error al publicar en Kafka
+          description: Error interno
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorRespuesta'
-              example:
-                error: "Error al publicar en Kafka: connection refused"
+                $ref: '#/components/schemas/Error'
 
-components:
-  schemas:
-    Cuenta:
-      type: object
-      description: Información completa de una cuenta financiera
-      properties:
-        IdCuenta:
-          type: string
-          description: ID único de la cuenta (Uint128 en formato decimal)
-          example: "100000000000000012345"
-        IdUsuarioFinal:
-          type: integer
-          format: uint64
-          description: ID del usuario propietario de la cuenta
+  /cuentas/{idusuariofinal}/{idmoneda}/desactivar:
+    put:
+      tags: [Cuentas]
+      summary: Desactivar cuenta
+      description: Cierra la cuenta en TigerBeetle (flag Closed). Requiere saldo cero.
+      parameters:
+        - name: idusuariofinal
+          in: path
+          required: true
+          schema:
+            type: integer
           example: 12345
-        IdLedger:
-          type: integer
-          format: uint32
-          description: ID del ledger al que pertenece la cuenta
+        - name: idmoneda
+          in: path
+          required: true
+          schema:
+            type: integer
           example: 1
-        Creditos:
-          type: string
-          description: Total de créditos posteados (Uint128 en formato decimal)
-          example: "50000"
-        Debitos:
-          type: string
-          description: Total de débitos posteados (Uint128 en formato decimal)
-          example: "25000"
-        Tipo:
-          type: integer
-          format: uint64
-          description: Tipo o código de la cuenta
+      responses:
+        '200':
+          description: Cuenta desactivada
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  Mensaje:
+                    type: string
+                    example: "Cuenta desactivada exitosamente"
+        '400':
+          description: Error al desactivar
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /cuentas/{idusuariofinal}/{idmoneda}/activar:
+    put:
+      tags: [Cuentas]
+      summary: Activar cuenta
+      description: Reactiva una cuenta previamente cerrada en TigerBeetle.
+      parameters:
+        - name: idusuariofinal
+          in: path
+          required: true
+          schema:
+            type: integer
+          example: 12345
+        - name: idmoneda
+          in: path
+          required: true
+          schema:
+            type: integer
           example: 1
-        Estado:
-          type: string
-          enum: ['A', 'I']
-          description: 'Estado de la cuenta: A (activa), I (inactiva/cerrada)'
-          example: "A"
-        FechaAlta:
-          type: string
-          description: Fecha de alta de la cuenta (almacenada en UserData32, precisión de segundos)
-          example: "2024-01-01 10:00:00"
-        FechaRegistro:
-          type: string
-          description: Timestamp de registro en TigerBeetle (asignado automáticamente, precisión de nanosegundos)
-          example: "2024-01-01 10:00:00.123456789"
+      responses:
+        '200':
+          description: Cuenta activada
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  Mensaje:
+                    type: string
+                    example: "Cuenta activada exitosamente"
+        '400':
+          description: Error al activar
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
 
-    BalanceHistorial:
-      type: object
-      description: Registro histórico del balance de una cuenta en un momento específico
-      properties:
-        debitos:
-          type: string
-          description: Débitos posteados al momento del registro (Uint128 en formato decimal)
-          example: "10000"
-        creditos:
-          type: string
-          description: Créditos posteados al momento del registro (Uint128 en formato decimal)
-          example: "25000"
-        balance:
-          type: string
-          description: Balance neto calculado como creditos - debitos
-          example: "15000"
-        timestamp:
-          type: integer
-          format: uint64
-          description: Timestamp del registro (nanosegundos desde epoch)
-          example: 1704067200000000000
+  # ── MONEDAS ────────────────────────────────────────────────────────────────
 
-    Transferencia:
-      type: object
-      description: Información completa de una transferencia financiera
-      properties:
-        IdTransferencia:
-          type: string
-          description: ID único de la transferencia (Uint128 en formato decimal)
-          example: "200000000000000000001"
-        IdCuentaDebito:
-          type: string
-          description: ID de la cuenta desde donde se debita (Uint128 en formato decimal)
-          example: "100000000000000012345"
-        IdCuentaCredito:
-          type: string
-          description: ID de la cuenta a donde se acredita (Uint128 en formato decimal)
-          example: "100000000000000067890"
-        IdLedger:
-          type: integer
-          format: uint32
-          description: ID del ledger de la transferencia
+  /monedas/{idmoneda}:
+    get:
+      tags: [Monedas]
+      summary: Obtener moneda por ID
+      parameters:
+        - name: idmoneda
+          in: path
+          required: true
+          schema:
+            type: integer
           example: 1
-        Monto:
-          type: string
-          description: Monto de la transferencia (Uint128 en formato decimal)
-          example: "5000"
-        Categoria:
-          type: integer
-          format: uint64
-          description: Categoría de la transferencia (almacenada en UserData64)
-          example: 101
-        Tipo:
-          type: integer
-          format: uint16
-          description: Flags de la transferencia
-          example: 0
-        Fecha:
-          type: string
-          description: Fecha y hora de la transferencia
-          example: "2024-01-01 15:30:45.123456789"
-        Estado:
-          type: string
-          description: Estado de la transferencia
-          example: "F"
+      responses:
+        '200':
+          description: Moneda encontrada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Moneda'
+        '404':
+          description: No encontrada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Error interno
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
 
-    CrearTransferenciaRequest:
-      type: object
-      required:
-        - id_transferencia
-        - id_cuenta_debito
-        - id_cuenta_credito
-        - monto
-        - ledger
-        - id_categoria
-        - fecha
-      properties:
-        id_transferencia:
-          type: string
-          description: ID único para la transferencia (Uint128 en formato decimal)
-          example: "200000000000000000001"
-        id_cuenta_debito:
-          type: string
-          description: ID de la cuenta desde donde se debita (Uint128 en formato decimal)
-          example: "100000000000000012345"
-        id_cuenta_credito:
-          type: string
-          description: ID de la cuenta a donde se acredita (Uint128 en formato decimal)
-          example: "100000000000000067890"
-        monto:
-          type: integer
-          format: uint64
-          description: Monto de la transferencia (debe ser mayor a 0)
-          example: 5000
-        ledger:
-          type: integer
-          format: uint32
-          description: ID del ledger (debe ser mayor a 0)
+    delete:
+      tags: [Monedas]
+      summary: Borrar moneda
+      parameters:
+        - name: idmoneda
+          in: path
+          required: true
+          schema:
+            type: integer
           example: 1
-        id_categoria:
-          type: integer
-          format: uint64
-          description: ID de categoría de la transferencia
-          example: 101
-        fecha:
-          type: string
-          description: Fecha y hora de la transferencia (formato datetime string)
-          example: "2024-01-01 15:30:45.123456789"
+      responses:
+        '200':
+          description: Moneda borrada
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  Mensaje:
+                    type: string
+                    example: "OK"
+        '400':
+          description: Error al borrar
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Error interno
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
 
-    ErrorRespuesta:
-      type: object
-      description: Estructura estándar de respuesta de error
-      properties:
-        error:
-          type: string
-          description: Mensaje descriptivo del error
-          example: "Error al procesar la solicitud"
+  /monedas:
+    get:
+      tags: [Monedas]
+      summary: Listar monedas
+      parameters:
+        - name: IncluyeInactivos
+          in: query
+          schema:
+            type: string
+            enum: [S, N]
+            default: N
+          description: "S=incluye inactivas, N=solo activas"
+      responses:
+        '200':
+          description: Lista de monedas
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Moneda'
+        '400':
+          description: Parámetro inválido
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Error interno
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+    post:
+      tags: [Monedas]
+      summary: Crear moneda
+      description: |
+        Crea la moneda en MySQL, crea la cuenta empresa en TigerBeetle y la activa.
+        Si algún paso falla se realiza rollback automático.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [IdMoneda]
+              properties:
+                IdMoneda:
+                  type: integer
+                  example: 2
+            example:
+              IdMoneda: 2
+      responses:
+        '201':
+          description: Moneda creada y activada
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  Mensaje:
+                    type: string
+                    example: "OK"
+        '400':
+          description: Datos inválidos o error de negocio
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Error interno
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /monedas/{idmoneda}/desactivar:
+    put:
+      tags: [Monedas]
+      summary: Desactivar moneda
+      parameters:
+        - name: idmoneda
+          in: path
+          required: true
+          schema:
+            type: integer
+          example: 1
+      responses:
+        '200':
+          description: Moneda desactivada
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  Mensaje:
+                    type: string
+                    example: "OK"
+        '400':
+          description: Error de negocio
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Error interno
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /monedas/{idmoneda}/activar:
+    put:
+      tags: [Monedas]
+      summary: Activar moneda
+      parameters:
+        - name: idmoneda
+          in: path
+          required: true
+          schema:
+            type: integer
+          example: 1
+      responses:
+        '200':
+          description: Moneda activada
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  Mensaje:
+                    type: string
+                    example: "OK"
+        '400':
+          description: Error de negocio
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Error interno
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  # ── PARÁMETROS ─────────────────────────────────────────────────────────────
+
+  /parametros/{parametro}:
+    get:
+      tags: [Parámetros]
+      summary: Obtener parámetro por clave
+      parameters:
+        - name: parametro
+          in: path
+          required: true
+          schema:
+            type: string
+          example: "LIMITEBUSCARCUENTAS"
+      responses:
+        '200':
+          description: Parámetro encontrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Parametro'
+        '404':
+          description: No encontrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Error interno
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+    put:
+      tags: [Parámetros]
+      summary: Modificar valor de un parámetro
+      description: Solo modifica parámetros con `EsModificable = S`.
+      parameters:
+        - name: parametro
+          in: path
+          required: true
+          schema:
+            type: string
+          example: "LIMITEBUSCARCUENTAS"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [Valor]
+              properties:
+                Valor:
+                  type: string
+                  example: "200"
+            example:
+              Valor: "200"
+      responses:
+        '200':
+          description: Parámetro modificado
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  Mensaje:
+                    type: string
+                    example: "OK"
+        '400':
+          description: Error de negocio
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Error interno
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /parametros:
+    get:
+      tags: [Parámetros]
+      summary: Buscar parámetros
+      parameters:
+        - name: Cadena
+          in: query
+          schema:
+            type: string
+          description: Texto de búsqueda en el nombre del parámetro. Vacío = todos.
+          example: "LIMITE"
+      responses:
+        '200':
+          description: Lista de parámetros
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Parametro'
+        '500':
+          description: Error interno
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  # ── USUARIOS ───────────────────────────────────────────────────────────────
+
+  /usuarios/{idusuario}:
+    get:
+      tags: [Usuarios]
+      summary: Obtener usuario por ID
+      parameters:
+        - name: idusuario
+          in: path
+          required: true
+          schema:
+            type: integer
+          example: 7
+      responses:
+        '200':
+          description: Usuario encontrado
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  Mensaje:
+                    type: string
+                    example: "OK"
+                  Usuario:
+                    $ref: '#/components/schemas/Usuario'
+        '400':
+          description: Error de negocio
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Error interno
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+    delete:
+      tags: [Usuarios]
+      summary: Borrar usuario
+      parameters:
+        - name: idusuario
+          in: path
+          required: true
+          schema:
+            type: integer
+          example: 7
+      responses:
+        '200':
+          description: Usuario borrado
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  Mensaje:
+                    type: string
+                    example: "OK"
+        '400':
+          description: Error de negocio
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Error interno
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /usuarios:
+    get:
+      tags: [Usuarios]
+      summary: Buscar usuarios
+      parameters:
+        - name: cadena
+          in: query
+          schema:
+            type: string
+          description: Texto de búsqueda en el nombre de usuario. Vacío = todos.
+          example: "juan"
+        - name: incluyeInactivos
+          in: query
+          schema:
+            type: string
+            enum: [S, N]
+            default: N
+          description: "S=incluye inactivos, N=solo activos"
+      responses:
+        '200':
+          description: Lista de usuarios
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Usuario'
+        '400':
+          description: Parámetro inválido
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Error interno
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+    post:
+      tags: [Usuarios]
+      summary: Crear usuario
+      description: Crea el usuario en estado Pendiente (P). Se genera una contraseña temporal que debe ser cambiada al confirmar la cuenta.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [Usuario]
+              properties:
+                Usuario:
+                  type: string
+                  example: "juan.perez"
+            example:
+              Usuario: "juan.perez"
+      responses:
+        '200':
+          description: Usuario creado
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  Id:
+                    type: integer
+                    example: 7
+                  PasswordTemporal:
+                    type: string
+                    example: "Ab3x!9Qz"
+        '400':
+          description: Error de negocio
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Error interno
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /usuarios/login:
+    post:
+      tags: [Usuarios]
+      summary: Login de usuario
+      security: []
+      description: Autentica al usuario y devuelve un token de sesión para usar como Bearer token.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [Usuario, Password]
+              properties:
+                Usuario:
+                  type: string
+                  example: "juan.perez"
+                Password:
+                  type: string
+                  description: Contraseña en texto plano (el sistema aplica MD5 internamente)
+                  example: "MiPassword123!"
+            example:
+              Usuario: "juan.perez"
+              Password: "MiPassword123!"
+      responses:
+        '200':
+          description: Login exitoso
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  Mensaje:
+                    type: string
+                    example: "OK"
+                  TokenSesion:
+                    type: string
+                    example: "eyJhbGci..."
+        '400':
+          description: Credenciales inválidas
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Error interno
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /usuarios/activar/{idusuario}:
+    put:
+      tags: [Usuarios]
+      summary: Activar usuario
+      description: Cambia el estado del usuario de Inactivo (I) a Activo (A).
+      parameters:
+        - name: idusuario
+          in: path
+          required: true
+          schema:
+            type: integer
+          example: 7
+      responses:
+        '200':
+          description: Usuario activado
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  Mensaje:
+                    type: string
+                    example: "OK"
+        '400':
+          description: Error de negocio
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Error interno
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /usuarios/desactivar/{idusuario}:
+    put:
+      tags: [Usuarios]
+      summary: Desactivar usuario
+      description: Cambia el estado del usuario de Activo (A) a Inactivo (I).
+      parameters:
+        - name: idusuario
+          in: path
+          required: true
+          schema:
+            type: integer
+          example: 7
+      responses:
+        '200':
+          description: Usuario desactivado
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  Mensaje:
+                    type: string
+                    example: "OK"
+        '400':
+          description: Error de negocio
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Error interno
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /usuarios/confirmar-cuenta/{idusuario}:
+    put:
+      tags: [Usuarios]
+      summary: Confirmar cuenta de usuario
+      description: |
+        Permite al usuario Pendiente (P) establecer su contraseña definitiva y activarse.
+        **Requiere el Bearer token de sesión temporal obtenido al hacer login con la contraseña temporal.**
+      parameters:
+        - name: idusuario
+          in: path
+          required: true
+          schema:
+            type: integer
+          example: 7
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [Password, ConfirmarPassword]
+              properties:
+                Password:
+                  type: string
+                  description: Nueva contraseña en texto plano
+                  example: "NuevaPassword123!"
+                ConfirmarPassword:
+                  type: string
+                  example: "NuevaPassword123!"
+            example:
+              Password: "NuevaPassword123!"
+              ConfirmarPassword: "NuevaPassword123!"
+      responses:
+        '200':
+          description: Cuenta confirmada y activada
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  Mensaje:
+                    type: string
+                    example: "OK"
+        '400':
+          description: Error de negocio o contraseñas no coinciden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Token de sesión ausente o inválido
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Error interno
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /usuarios/password/modificar:
+    put:
+      tags: [Usuarios]
+      summary: Modificar contraseña del usuario autenticado
+      description: El usuario autenticado (Bearer token) cambia su propia contraseña.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [PasswordAnterior, PasswordNuevo, ConfirmarPassword]
+              properties:
+                PasswordAnterior:
+                  type: string
+                  example: "PasswordActual123!"
+                PasswordNuevo:
+                  type: string
+                  example: "PasswordNuevo456!"
+                ConfirmarPassword:
+                  type: string
+                  example: "PasswordNuevo456!"
+            example:
+              PasswordAnterior: "PasswordActual123!"
+              PasswordNuevo: "PasswordNuevo456!"
+              ConfirmarPassword: "PasswordNuevo456!"
+      responses:
+        '200':
+          description: Contraseña modificada
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  Mensaje:
+                    type: string
+                    example: "OK"
+        '400':
+          description: Error de negocio o validación
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Error interno
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /usuarios/password/reestablecer:
+    put:
+      tags: [Usuarios]
+      summary: Restablecer contraseña de un usuario
+      description: Genera una nueva contraseña temporal para el usuario indicado. El usuario deberá confirmar su cuenta nuevamente.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [IdUsuario]
+              properties:
+                IdUsuario:
+                  type: integer
+                  example: 7
+            example:
+              IdUsuario: 7
+      responses:
+        '200':
+          description: Contraseña restablecida
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  PasswordTemporal:
+                    type: string
+                    example: "Zq7!mNx2"
+        '400':
+          description: Error de negocio
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Error interno
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
