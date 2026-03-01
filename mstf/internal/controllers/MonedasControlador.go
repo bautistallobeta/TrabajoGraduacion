@@ -73,13 +73,7 @@ func (mc *MonedasControlador) Crear(c echo.Context) error {
 	if req.IdMoneda <= 0 {
 		return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta("IdMoneda es campo obligatorio"))
 	}
-	// crea la moneda (estado P)
-	// si no falla, crea la cuenta empresa en TB
-	// si eso no falla, activa la moneda (estado A)
-	// si la primera creacion falla, retorna el error;
-	// si tigerbeetle falla, borra la moneda creada;
-	// si falla la activacion, borra la moneda pero no la cuenta empresa (TB no permite borrar cuentas)
-	// si se reintenta la creacion de la misma moneda, al llegar al punto de TB, si TB retorna AccountExists y se busca que la account no tenga transfers, entonces no se lo toma por error pues indicaría que se está reintentando.
+	// crea la moneda (estado P), crea la cuenta empresa en TB y activa la moneda (estado A)
 	ctx := c.Request().Context()
 	mensaje, err := mc.Gestor.Crear(ctx, models.Monedas{IdMoneda: req.IdMoneda, IdCuentaEmpresa: utils.ConcatenarIDString(uint64(req.IdMoneda), uint64(0))})
 	log.Printf("\n\nMonedasControlador.Crear: Resultado de creación en GestorMonedas: mensaje='%s', error='%v'", mensaje, err)
@@ -103,7 +97,7 @@ func (mc *MonedasControlador) Crear(c echo.Context) error {
 		return c.JSON(http.StatusInternalServerError, models.NewErrorRespuesta("Error al crear cuenta empresa: "+utils.SanitizarError(err)))
 	}
 
-	// si se creó la cuenta en TB, intenta activar la moneda, si falla, borra la moneda pero no la cuenta empresa (TB no permite borrar cuentas)
+	// si se creó la cuenta en TB, intenta activar la moneda, si falla, borra la moneda pero no la cuenta empresa (TB no permite borrado)
 	moneda := &models.Monedas{IdMoneda: req.IdMoneda}
 	mensaje, err = moneda.Activar(ctx)
 	if err != nil || mensaje != "OK" {

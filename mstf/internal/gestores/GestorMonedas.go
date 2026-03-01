@@ -5,7 +5,6 @@ import (
 	"MSTransaccionesFinancieras/internal/infra/persistence"
 	"MSTransaccionesFinancieras/internal/models"
 	"context"
-	"errors"
 	"strconv"
 )
 
@@ -56,10 +55,6 @@ func (gm *GestorMonedas) Listar(IncluyeInactivos string) ([]models.Monedas, erro
 // tsp_borrar_moneda
 // - Moneda.IdMoneda: Id de la moneda a borrar
 func (gm *GestorMonedas) Borrar(ctx context.Context, Moneda models.Monedas) (string, error) {
-	// BORRAR TEST
-	if Moneda.IdMoneda == 901 {
-		return "", errors.New("error simulado: MySQL caido en rollback")
-	}
 	credencial, actor := auth.CredencialDesdeCtx(ctx)
 	var mensaje string
 	err := persistence.ClienteMySQL.QueryRow("CALL tsp_borrar_moneda(?, ?, ?)", credencial, actor, Moneda.IdMoneda).Scan(&mensaje)

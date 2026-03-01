@@ -23,7 +23,7 @@ func NewGestorTransferencias(notificador *webhook.Notificador) *GestorTransferen
 	}
 }
 
-// BuscarAvanzado busca transferencias según los filtros especificados.
+// Bbusca transferencias según los filtros especificados.
 // Si IdsTransferencia tiene elementos, hace LookupTransfers directo e ignora el resto de filtros.
 // Parámetros numéricos con valor 0 deshabilitan ese filtro en TigerBeetle.
 // Estado: "F" para finalizadas, "R" para revertidas, "" para todas.
@@ -46,7 +46,7 @@ func (gt *GestorTransferencias) BuscarAvanzado(
 		return nil, errors.New("Conexión a TigerBeetle no inicializada")
 	}
 
-	// Camino A: lookup directo por IDs (ignora el resto de parámetros)
+	// lookup directo por IDs (ignora el resto de parámetros)
 	if len(IdsTransferencia) > 0 {
 		return persistence.ClienteTB.LookupTransfers(IdsTransferencia)
 	}
@@ -113,7 +113,7 @@ func (gt *GestorTransferencias) BuscarAvanzado(
 			break
 		}
 
-		// el último elemento es el más antiguo del batch (reversed=true); avanzar cursor hacia atrás
+		// el último elemento es el más antiguo del batch; avanzar cursor hacia atrás
 		ultimoTimestamp := transfers[len(transfers)-1].Timestamp
 		if ultimoTimestamp == 0 {
 			break
@@ -130,7 +130,7 @@ func (gt *GestorTransferencias) BuscarAvanzado(
 	return resultados, nil
 }
 
-// ProcesarLote procesa un lote de transferencias recibido del consumidor Kafka.
+// Procesa un lote de transferencias recibido del consumidor Kafka.
 // Valida reglas de negocio antes de enviar a TigerBeetle.
 // Las transferencias que fallan validación no van a TB pero sí se notifican con su error.
 // FallidasParseo son transferencias que fallaron en el parseo del mensaje Kafka (también se notifican)
@@ -142,7 +142,7 @@ func (gt *GestorTransferencias) ProcesarLote(Batch []types.Transfer, KafkaMsgs [
 	// validar existencia y saldo de cuentas antes de ir a TigerBeetle
 	erroresCuentas, err := gt.preValidarCuentas(Batch)
 	if err != nil {
-		// error de infraestructura (TB caído) → no notificar, dejar que procesarConRetry reintente
+		// error de infraestructura (TB caído): no notificar, dejar que procesarConRetry reintente
 		log.Printf("ERROR [GestorTransferencias.ProcesarLote]: Error de infraestructura en preValidarCuentas: %v", err)
 		return err
 	}
@@ -160,7 +160,6 @@ func (gt *GestorTransferencias) ProcesarLote(Batch []types.Transfer, KafkaMsgs [
 			var errInfra error
 			estadoError, errInfra = gt.validarReversion(t, KafkaMsgs[i])
 			if errInfra != nil {
-				// error de infraestructura (TB caído) → no notificar, dejar que procesarConRetry reintente
 				log.Printf("ERROR [GestorTransferencias.ProcesarLote]: Error de infraestructura en validarReversion: %v", errInfra)
 				return errInfra
 			}
@@ -216,6 +215,10 @@ func (gt *GestorTransferencias) ProcesarLote(Batch []types.Transfer, KafkaMsgs [
 	return nil
 }
 
+// --------------------------------------------------------------------------------
+// Funciones aux
+// --------------------------------------------------------------------------------
+
 // Valida reglas de negocio sobre una transferencia antes de enviarla a TigerBeetle.
 // Retorna "" si la transferencia es válida, o un string con el código de error.
 func (gt *GestorTransferencias) validarTransferencia(t types.Transfer) string {
@@ -245,11 +248,10 @@ func (gt *GestorTransferencias) validarTransferencia(t types.Transfer) string {
 }
 
 // preValidarCuentas verifica, en una única llamada batch a TigerBeetle, que:
-//   - la cuenta débito y la cuenta crédito existen,
-//   - la cuenta débito no está cerrada (flag Closed),
-//   - si la cuenta débito tiene el flag DebitsMustNotExceedCredits, el saldo
-//     disponible (descontando los débitos virtuales ya aprobados en este batch)
-//     es suficiente para cubrir el monto.
+//
+//	-la cuenta débito y la cuenta crédito existen,
+//	-la cuenta débito no está cerrada (flag Closed),
+//	-si la cuenta débito tiene el flag DebitsMustNotExceedCredits, el saldo disponible (descontando los débitos virtuales ya aprobados en este batch) es suficiente para cubrir el monto.
 //
 // Retorna (slice, nil): slice del mismo largo que batch ("" = válida, otro valor = error de negocio).
 // Retorna (nil, error): error de infraestructura (TB caído) que debe reintentarse, no notificarse.
@@ -260,7 +262,6 @@ func (gt *GestorTransferencias) preValidarCuentas(batch []types.Transfer) ([]str
 		return errores, nil
 	}
 
-	//IDs únicos de cuentas débito y crédito del batch
 	idsSet := make(map[types.Uint128]struct{})
 	for _, t := range batch {
 		idsSet[t.DebitAccountID] = struct{}{}
@@ -277,7 +278,7 @@ func (gt *GestorTransferencias) preValidarCuentas(batch []types.Transfer) ([]str
 		return nil, err
 	}
 
-	// mapeo accountID → Account para lookup
+	// mapeo accountID-Account para lookup
 	mapaAccounts := make(map[types.Uint128]types.Account, len(accounts))
 	for _, a := range accounts {
 		mapaAccounts[a.ID] = a
@@ -310,7 +311,7 @@ func (gt *GestorTransferencias) preValidarCuentas(batch []types.Transfer) ([]str
 		}
 
 		if (debitAccount.Flags & flagDebitsMustNotExceedCredits) != 0 {
-			// Leer lower 64 bits en LE
+			// Leer 64 LSbits en LE
 			creditsPosted := binary.LittleEndian.Uint64(debitAccount.CreditsPosted[:8])
 			debitsPosted := binary.LittleEndian.Uint64(debitAccount.DebitsPosted[:8])
 			monto := binary.LittleEndian.Uint64(t.Amount[:8])
@@ -348,7 +349,6 @@ func (gt *GestorTransferencias) validarReversion(t types.Transfer, kafkaMsg mode
 
 	transfers, err := persistence.ClienteTB.GetAccountTransfers(filtro)
 	if err != nil {
-		// error de infraestructura: el caller debe reintentar, no notificar como error de negocio
 		return "", err
 	}
 	if len(transfers) == 0 {

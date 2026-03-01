@@ -26,7 +26,6 @@ type Config struct {
 }
 
 func Load() Config {
-	// Carga de .env. Si no existe (ej: producción con vars de entorno del sistema), se continúa sin error.
 	if err := godotenv.Load(); err != nil {
 		log.Printf("Archivo .env no encontrado, se usarán variables de entorno del sistema: %v", err)
 	}
@@ -55,7 +54,7 @@ func Load() Config {
 	return cfg
 }
 
-// requireEnv lee una variable de entorno requerida. Si no está definida, detiene el proceso.
+// lee variable entorno dle sistema, si no existe, error fatal
 func requireEnv(key string) string {
 	value, exists := os.LookupEnv(key)
 	if !exists || value == "" {

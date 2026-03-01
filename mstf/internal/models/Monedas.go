@@ -72,7 +72,7 @@ func (m *Monedas) Dame() (string, error) {
 	return mensaje, nil
 }
 
-// Activa una moneda pendiente asignando la cuenta empresa.
+// Activa una moneda, siempre y cuando esté en estado Pendiente o Inactiva ('P' | 'I').
 // tsp_activar_moneda
 func (m *Monedas) Activar(ctx context.Context) (string, error) {
 	credencial, actor := auth.CredencialDesdeCtx(ctx)
@@ -85,7 +85,7 @@ func (m *Monedas) Activar(ctx context.Context) (string, error) {
 	return mensaje, nil
 }
 
-// Desactiva una moneda activa.
+// Desactiva una moneda en estado Activo ('A').
 // tsp_desactivar_moneda
 func (m *Monedas) Desactivar(ctx context.Context) (string, error) {
 	credencial, actor := auth.CredencialDesdeCtx(ctx)

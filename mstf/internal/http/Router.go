@@ -24,7 +24,7 @@ func InitRouter(notificador *webhook.Notificador, productor *kafkamstf.Productor
 		middleware.CORS(),
 		httpMiddleware.AutenticacionDual(func(c echo.Context) bool {
 			path := c.Request().URL.Path
-			// confirmar-cuenta usa token de sesión Estado=P; el SP valida internamente.
+			// confirmar-cuenta SÍ usa token de sesión Estado=P; el SP valida internamente.
 			return path == "/ping" || path == "/usuarios/login" ||
 				strings.HasPrefix(path, "/usuarios/confirmar-cuenta/")
 		}),

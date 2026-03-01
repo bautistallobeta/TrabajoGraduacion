@@ -8,7 +8,7 @@ import (
 	"github.com/tigerbeetle/tigerbeetle-go/pkg/types"
 )
 
-// instancia Singleton del Client de TigerBeetle.
+// instancia global de cliente de TB
 var ClienteTB tigerbeetle.Client
 
 func InitTBClient(cfg config.Config) error {

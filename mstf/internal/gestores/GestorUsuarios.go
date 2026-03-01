@@ -18,8 +18,8 @@ func NewGestorUsuarios() *GestorUsuarios {
 // Permite crear un usuario administrativo en estado P: Pendiente.
 // Genera una contraseña aleatoria que se devuelve para informar al usuario.
 // Al iniciar sesión por primera vez, deberá cambiar su contraseña y se activará.
-// Devuelve OK + Id + PasswordTemporal o el mensaje de error.
 // tsp_crear_usuario
+// - Usuario.Usuario: nombre de usuario a crear
 func (gu *GestorUsuarios) Crear(ctx context.Context, Usuario models.Usuarios) (string, int, string, error) {
 	credencial, actor := auth.CredencialDesdeCtx(ctx)
 	var mensaje string
@@ -64,6 +64,7 @@ func (gu *GestorUsuarios) Buscar(Cadena string, IncluyeInactivos string) ([]*mod
 
 // Permite eliminar un usuario siempre y cuando no tenga registros en Operaciones.
 // tsp_borrar_usuario
+// - Usuario.IdUsuario: ID del usuario a eliminar
 func (gu *GestorUsuarios) Borrar(ctx context.Context, Usuario models.Usuarios) (string, error) {
 	credencial, actor := auth.CredencialDesdeCtx(ctx)
 	var mensaje string
@@ -91,6 +92,7 @@ func (gu *GestorUsuarios) ModificarPassword(ctx context.Context, PasswordAnterio
 
 // Permite a un administrador logueado restablecer la contraseña de otro usuario.
 // tsp_restablecer_password_usuario
+// - Usuario.IdUsuario: ID del usuario al que se le restablecerá la contraseña
 func (gu *GestorUsuarios) RestablecerPassword(Usuario models.Usuarios) (string, string, error) {
 	var mensaje string
 	var passwordTemporal sql.NullString

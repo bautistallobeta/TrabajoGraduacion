@@ -9,9 +9,9 @@ import (
 
 var cacheApiKeys = cache.NewCache[bool](5 * time.Minute)
 
-// Autenticar valida las credenciales del actor contra la base de datos.
+// Valida las creadenciales del actor (SISTEMA o USUARIO) )
 // Para SISTEMA: cachea la API key durante 5 minutos para reducir roundtrips.
-// Para USUARIO: siempre consulta la DB (tokens son de corta vida y alta seguridad).
+// Para USUARIO: siempre consulta la DB
 func Autenticar(credencial string, actor string) error {
 	if actor == "SISTEMA" {
 		if _, ok := cacheApiKeys.Dame(credencial); ok {

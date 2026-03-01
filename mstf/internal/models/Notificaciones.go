@@ -27,7 +27,7 @@ type LoteNotificado struct {
 }
 
 // Crear una notif a partir de una Transferencia, su mensaje Kafka original y su resultado de TigerBeetle.
-// Si TB devuelve TransferExists (code 46), la transfer se reporta como exitosa con mensaje
+// Si TB devuelve TransferExists, la transfer se reporta como exitosa con mensaje
 // "TransferOKAlreadyProcessed": ya fue procesada en un intento anterior (idempotencia ante reintentos).
 func NewTransferenciaNotificada(transfer types.Transfer, kafkaMsg KafkaTransferencias, result types.TransferEventResult) TransferenciaNotificada {
 	var estado, mensaje string
@@ -36,7 +36,7 @@ func NewTransferenciaNotificada(transfer types.Transfer, kafkaMsg KafkaTransfere
 		estado = "F"
 		mensaje = "TransferOK"
 	case types.TransferExists:
-		// Idempotencia: misma transfer enviada en un reintento. Ya fue registrada en TB exitosamente.
+		// Idempotencia: registrada en TB exitosamente, pero se indica que hubo reintento de algun lado
 		estado = "F"
 		mensaje = "TransferOKAlreadyProcessed"
 	default:
@@ -44,7 +44,7 @@ func NewTransferenciaNotificada(transfer types.Transfer, kafkaMsg KafkaTransfere
 		mensaje = result.Result.String()
 	}
 
-	// Si UserData32 es 0 (fecha no pudo parsearse al construir la transfer), se usa el valor raw de Kafka.
+	// Si llega UserData32 es 0 usa valor raw de kafka
 	fecha := "-"
 	if transfer.UserData32 > 0 {
 		if f, err := utils.UserData32AFecha(transfer.UserData32); err == nil {

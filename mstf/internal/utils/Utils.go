@@ -207,7 +207,7 @@ func MontoDecimalAUnidadMinima(monto float64) uint64 {
 	return resultado
 }
 
-// SanitizarError oculta detalles de infraestructura en errores de red/conexión.
+// Funcion p ocultar algunos detalles de infraestructura en errores de red/conexión.
 // Para errores de red (ej: MySQL o TigerBeetle inaccesibles), devuelve un mensaje genérico.
 // Para otros errores, devuelve el mensaje original.
 func SanitizarError(err error) string {

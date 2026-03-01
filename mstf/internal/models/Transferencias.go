@@ -30,6 +30,7 @@ type Transferencias struct {
 	IdTransferenciaOriginal string `json:",omitempty"`
 }
 
+// Instancia los datos de la transferencia leyendo desde TigerBeetle a partir del IdTransferencia
 func (t *Transferencias) Dame() error {
 	idTransferenciaCast, err := utils.ParsearUint128(t.IdTransferencia)
 	if err != nil {
@@ -55,7 +56,7 @@ func (t *Transferencias) Dame() error {
 
 	transferenciaTB := transfers[0]
 
-	// Compatibilidad: transfers nuevas usan UserData32 (segundos epoch), viejas usaban UserData128 (nanosegundos).
+	// Control para compatibilidad (transfers nuevas usan UserData32 (segundos epoch), en iteracion anterio use UserData128 (nanosegundos))
 	var fecha string
 	if transferenciaTB.UserData32 > 0 {
 		fecha, _ = utils.UserData32AFecha(transferenciaTB.UserData32)
@@ -79,7 +80,7 @@ func (t *Transferencias) Dame() error {
 		t.Estado = "F"
 	}
 
-	// Derivar Tipo e IdUsuarioFinal comparando DebitAccountID/CreditAccountID con la cuenta empresa
+	// Deriva Tipo e IdUsuarioFinal comparando DebitAccountID/CreditAccountID con la cuenta empresa
 	moneda := &Monedas{IdMoneda: int(transferenciaTB.Ledger)}
 	if _, err := moneda.Dame(); err == nil && moneda.IdCuentaEmpresa != "" {
 		idCuentaEmpresa, errParse := utils.ParsearUint128(moneda.IdCuentaEmpresa)
@@ -87,7 +88,7 @@ func (t *Transferencias) Dame() error {
 			var idCuentaUsuario types.Uint128
 			if code == CodigoTransferenciaReversion {
 				t.Tipo = "R"
-				// En reversión las cuentas están invertidas
+				// En reversión: cuentas invertidas
 				if transferenciaTB.DebitAccountID == idCuentaEmpresa {
 					idCuentaUsuario = transferenciaTB.CreditAccountID
 				} else {
@@ -103,7 +104,6 @@ func (t *Transferencias) Dame() error {
 				}
 			}
 
-			// Obtener IdUsuarioFinal del UserData64 de la cuenta usuario en TB
 			cuentas, errLookup := persistence.ClienteTB.LookupAccounts([]types.Uint128{idCuentaUsuario})
 			if errLookup == nil && len(cuentas) > 0 {
 				t.IdUsuarioFinal = cuentas[0].UserData64
@@ -114,7 +114,7 @@ func (t *Transferencias) Dame() error {
 	return nil
 }
 
-// PoblarDesdeTB llena el struct con los datos directamente disponibles en el Transfer de TB,
+// Puebla el struct con los datos directamente disponibles en el Transfer de TB,
 // sin realizar consultas adicionales a cuentas ni monedas.
 // Tipo queda vacío para transfers normales (requiere lookup de cuenta empresa para derivarlo).
 // IdUsuarioFinal se lee de UserData128 (solo disponible en transfers creadas tras el cambio que lo almacena ahí).

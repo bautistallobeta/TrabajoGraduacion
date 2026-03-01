@@ -18,7 +18,7 @@ type Parametros struct {
 
 var CacheParametros = cache.NewCache[Parametros](5 * time.Minute)
 
-// Devuelve los datos de un parámetro específico por su clave.
+// Instancia un parámetro específico por su clave.
 // tsp_dame_parametro
 func (p *Parametros) Dame() (string, error) {
 	if cached, ok := CacheParametros.Dame(p.Parametro); ok {
@@ -69,6 +69,7 @@ func (p *Parametros) Dame() (string, error) {
 
 // Permite buscar los parámetros del sistema según su nombre.
 // tsp_buscar_parametros
+// - Cadena: texto a buscar dentro del nombre del parámetro (puede ser parte del nombre o el nombre completo)
 func (p *Parametros) BuscarParametros(Cadena string) ([]Parametros, error) {
 	rows, err := persistence.ClienteMySQL.Query("CALL tsp_buscar_parametros(?, ?)", Cadena, "N")
 	if err != nil {

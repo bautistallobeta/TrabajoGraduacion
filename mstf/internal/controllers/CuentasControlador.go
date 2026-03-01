@@ -237,7 +237,7 @@ func (cc *CuentasControlador) Crear(c echo.Context) error {
 		return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta("Falta campo requerido: Fecha"))
 	}
 
-	// cuentas creadas vía API siempre tienen DebitsMustNotExceedCredits = true (IdUsuarioFinal > 0)
+	// cuentas creadas vía APIREST: DebitsMustNotExceedCredits = true (IdUsuarioFinal > 0)
 	idCuentaTBString, existe, err := cc.Gestor.Crear(models.Cuentas{IdMoneda: req.IdMoneda, IdUsuarioFinal: req.IdUsuarioFinal, Fecha: req.Fecha})
 	log.Printf("\n\nCuentasControlador.Crear: Resultado de creación en GestorCuentas: mensaje='%s', existe=%v, error='%v'", idCuentaTBString, existe, err)
 	if err != nil {
@@ -299,7 +299,7 @@ func (cc *CuentasControlador) Activar(c echo.Context) error {
 }
 
 func (cc *CuentasControlador) Buscar(c echo.Context) error {
-	// IdsUsuarioFinal e IdsMoneda: arrays paralelos para lookup directo. Deben tener la misma cantidad.
+	//  arrays "paralelos" para EL lookup directo
 	idsUsuarioFinalStr := c.QueryParams()["IdsUsuarioFinal"]
 	idsMonedaStr := c.QueryParams()["IdsMoneda"]
 
@@ -376,7 +376,7 @@ func (cc *CuentasControlador) Buscar(c echo.Context) error {
 		return c.JSON(http.StatusInternalServerError, models.NewErrorRespuesta("Error al buscar cuentas: "+utils.SanitizarError(err)))
 	}
 
-	// armar respuesta formateada
+	// respuesta formateada
 	respuesta := make([]models.Cuentas, 0, len(cuentas))
 	for _, cuentaTB := range cuentas {
 		cuenta := models.Cuentas{
@@ -386,7 +386,7 @@ func (cc *CuentasControlador) Buscar(c echo.Context) error {
 			Creditos:       utils.Uint128ADecimalMoneda(cuentaTB.CreditsPosted),
 			Debitos:        utils.Uint128ADecimalMoneda(cuentaTB.DebitsPosted),
 		}
-		//Leer el estado
+		//Obtencion del estado
 		closedFlags := types.AccountFlags{Closed: true}.ToUint16()
 		if (cuentaTB.Flags & closedFlags) != 0 {
 			cuenta.Estado = "I"

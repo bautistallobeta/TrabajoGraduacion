@@ -244,8 +244,7 @@ func (uc *UsuariosControlador) ConfirmarUsuario(c echo.Context) error {
 	if req.Password != req.ConfirmarPassword {
 		return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta("La confirmación de la contraseña no coincide"))
 	}
-	// Esta ruta se omite del middleware de auth (tsp_autenticar_actor rechaza tokens Estado=P).
-	// El SP valida el token de sesión internamente. Se extrae el Bearer del header directamente.
+	// Esta ruta se omite del middleware de authpero el SP valida el token de sesión internamente
 	authHeader := c.Request().Header.Get("Authorization")
 	partes := strings.SplitN(authHeader, " ", 2)
 	if len(partes) != 2 || strings.ToLower(partes[0]) != "bearer" || partes[1] == "" {

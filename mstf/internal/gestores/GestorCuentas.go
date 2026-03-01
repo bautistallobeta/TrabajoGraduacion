@@ -26,9 +26,9 @@ func NewGestorCuentas() *GestorCuentas {
 	return &GestorCuentas{}
 }
 
-// BuscarAvanzado busca cuentas según los filtros especificados.
+// Busca cuentas según los filtros especificados.
 // Si IdsCuenta tiene elementos, hace LookupAccounts directo e ignora el resto de filtros.
-// Parámetros con valor 0 desactivan ese filtro en TigerBeetle.
+// Parámetros con valor 0 desactivan ese filtro.
 // Estado: "A" para activas, "I" para inactivas/cerradas, "" para todas.
 // Limit: máximo número de cuentas a retornar (0 = sin límite).
 func (gc *GestorCuentas) BuscarAvanzado(
@@ -43,7 +43,7 @@ func (gc *GestorCuentas) BuscarAvanzado(
 		return nil, errors.New("Conexión a TigerBeetle no inicializada")
 	}
 
-	// Camino A: lookup directo por IDs (ignora el resto de parámetros)
+	// lookup directo por IDs (ignora el resto de parámetros)
 	if len(IdsCuenta) > 0 {
 		return persistence.ClienteTB.LookupAccounts(IdsCuenta)
 	}
@@ -125,10 +125,10 @@ func (gc *GestorCuentas) BuscarAvanzado(
 	return resultados, nil
 }
 
-// Crear intenta crear una cuenta en TigerBeetle.
+// Crea una cuenta en TigerBeetle.
 // Retorna (idCuenta, existe, error).
 // existe=true indica que la cuenta ya existía con los mismos parámetros (idempotencia ante reintentos).
-// Si Cuenta.IdUsuarioFinal es 0, se trata como cuenta empresa (DebitsMustNotExceedCredits=false).
+// Si IdUsuarioFinal es 0, se trata como cuenta empresa (DebitsMustNotExceedCredits=false).
 func (gc *GestorCuentas) Crear(Cuenta models.Cuentas) (string, bool, error) {
 	idMoneda := Cuenta.IdMoneda
 	idUsuarioFinal := Cuenta.IdUsuarioFinal
@@ -144,7 +144,7 @@ func (gc *GestorCuentas) Crear(Cuenta models.Cuentas) (string, bool, error) {
 	if _, err := moneda.Dame(); err != nil {
 		return "", false, errors.New("La moneda no existe o no está activa")
 	}
-	// Chequeo que se hace solo si la cuenta no es cuentaempresa
+	// Solo si la cuenta no es cuentaempresa
 	if debitosNoDebenExcederCreditos && moneda.Estado != "A" {
 		return "", false, errors.New("La moneda no existe o no está activa")
 	}
@@ -182,7 +182,7 @@ func (gc *GestorCuentas) Crear(Cuenta models.Cuentas) (string, bool, error) {
 		return "", false, errors.New("error de comunicación con TigerBeetle")
 	}
 	if len(results) > 0 {
-		// AccountExists significa que ya existe con los mismos parámetros: idempotencia ante reintentos
+		// AccountExists significa que ya existe con los MISMOS params (idempot)
 		if results[0].Result == types.AccountExists {
 			return idCuenta, true, nil
 		}
@@ -191,7 +191,7 @@ func (gc *GestorCuentas) Crear(Cuenta models.Cuentas) (string, bool, error) {
 	return idCuenta, false, nil
 }
 
-// CrearLote crea múltiples cuentas en TigerBeetle en un solo llamado.
+// Crea múltiples cuentas en TigerBeetle en un solo llamado.
 // Recibe los mismos datos que Crear pero como array.
 func (gc *GestorCuentas) CrearLote(Cuentas []CuentaNueva) ([]string, error) {
 	if persistence.ClienteTB == nil {
@@ -253,7 +253,6 @@ func (gc *GestorCuentas) CrearLote(Cuentas []CuentaNueva) ([]string, error) {
 	}
 	fallosReales := 0
 	for _, r := range results {
-		// AccountExists significa que ya existe con los mismos parámetros: idempotencia ante reintentos
 		if r.Result == types.AccountExists {
 			continue
 		}
@@ -269,7 +268,7 @@ func (gc *GestorCuentas) CrearLote(Cuentas []CuentaNueva) ([]string, error) {
 	return ids, nil
 }
 
-// Desactivar cierra una cuenta en TigerBeetle creando un pending transfer con closing_debit.
+// Cierra una cuenta en TigerBeetle creando un pending transfer con closing_debit.
 // La cuenta empresa de la moneda actúa como cuenta crédito (monto 0, no se transfiere dinero).
 // Idempotente: si la cuenta ya está cerrada, retorna nil.
 func (gc *GestorCuentas) Desactivar(Cuenta models.Cuentas) error {
@@ -314,7 +313,7 @@ func (gc *GestorCuentas) Desactivar(Cuenta models.Cuentas) error {
 	}
 
 	// ID único: high=timestamp nanosegundos, low=idUsuarioFinal
-	// No colisiona con transfers normales (upper=0) ni reversiones (upper=1)
+	// No colisiona con transfers normales (64 MSBits=0000...0) ni reversiones (64 MSBits=0000...1)
 	idCierreStr := utils.ConcatenarIDString(uint64(time.Now().UnixNano()), idUsuarioFinal)
 	idCierreTB, err := utils.ParsearUint128(idCierreStr)
 	if err != nil {
@@ -346,7 +345,7 @@ func (gc *GestorCuentas) Desactivar(Cuenta models.Cuentas) error {
 	return nil
 }
 
-// Activar reabre una cuenta cerrada en TigerBeetle voidando el closing pending transfer.
+// Reabre una cuenta cerrada en TigerBeetle voidando el closing pending transfer.
 // Busca la transfer de cierre como la más reciente en débito de la cuenta (la única posible
 // tras el cierre, ya que TB rechaza nuevas transfers sobre cuentas cerradas).
 // Idempotente: si la cuenta ya está activa, retorna nil.
@@ -379,7 +378,7 @@ func (gc *GestorCuentas) Activar(Cuenta models.Cuentas) error {
 	}
 
 	// La transfer más reciente en débito debe ser el closing pending transfer
-	// (TB no admite nuevas transfers sobre cuentas cerradas)
+	// (Aunque igualmente TB no admite nuevas transfers sobre cuentas cerradas)
 	filtro := types.AccountFilter{
 		AccountID: idCuenta,
 		Limit:     1,
@@ -409,7 +408,7 @@ func (gc *GestorCuentas) Activar(Cuenta models.Cuentas) error {
 	voidTransfer := types.Transfer{
 		ID:        idVoidTB,
 		PendingID: closingTransfer.ID,
-		Code:      models.CodigoTransferenciaCierre, // mismo code que el closing → filtrado en Buscar
+		Code:      models.CodigoTransferenciaCierre, // mismo code que el closing
 		Flags:     types.TransferFlags{VoidPendingTransfer: true}.ToUint16(),
 	}
 
@@ -426,7 +425,7 @@ func (gc *GestorCuentas) Activar(Cuenta models.Cuentas) error {
 }
 
 // --------------------------------------------------------------------------------
-// Funciones Aux
+// Funciones aux
 // --------------------------------------------------------------------------------
 
 // filtra un slice de accounts por estado (A/I)

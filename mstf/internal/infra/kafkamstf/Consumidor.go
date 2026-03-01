@@ -46,7 +46,7 @@ func NewConsumidor(cfg config.Config, procesador *gestores.GestorTransferencias)
 	}
 }
 
-// Start inicia el consumidor en una goroutine
+// Start inicia el consumidor en una goroutine nueva
 func (c *Consumidor) Start() {
 	c.wg.Add(1)
 	go c.batchLoop()
@@ -83,10 +83,10 @@ func (c *Consumidor) batchLoop() {
 
 			log.Printf("Lote de Kafka recibido. Procesando %d transferencias (%d fallidas en parseo).", len(transferenciasLote), len(fallidasParseo))
 
-			// Procesar con retry en memoria: no avanza al próximo lote hasta que éste tenga éxito.
-			// Si el MS cae durante el retry, Kafka re-entrega el lote desde el offset no committeado.
+			// Procesar con retry en memoria: no avanza al próximo lote hasta que el actual se procese
+			// Si el MS cae durante el retry, Kafka retoma desde el ultimo offset no commiteado
 			if err := c.procesarConRetry(ctx, mensajesLote, transferenciasLote, kafkaMsgsLote, fallidasParseo); err != nil {
-				return // consumidor detenido durante reintento
+				return
 			}
 		}
 	}
@@ -174,8 +174,7 @@ func (c *Consumidor) armarLoteDesdeKafka(ctx context.Context) ([]kafka.Message, 
 	return mensajesLote, transferenciasLote, kafkaMsgsLote, fallidasParseo
 }
 
-// Mensaje de Kafka a Transfer de TigerBeetle.
-// Construye DebitAccountID y CreditAccountID a partir de IdUsuarioFinal, IdMoneda y Tipo (I/E).
+// Mensaje de Kafka a Transfer de TigerBeetle. Construye DebitAccountID y CreditAccountID a partir de IdUsuarioFinal, IdMoneda y Tipo (I/E).
 func (c *Consumidor) parseKafkaMessage(msg kafka.Message) (types.Transfer, models.KafkaTransferencias, error) {
 	var kafkaMsg models.KafkaTransferencias
 
@@ -243,7 +242,7 @@ func (c *Consumidor) parseKafkaMessage(msg kafka.Message) (types.Transfer, model
 		Amount:          types.ToUint128(utils.MontoDecimalAUnidadMinima(kafkaMsg.Monto)),
 		Ledger:          kafkaMsg.IdMoneda,
 		Code:            models.CodigoTransferenciaNormal,
-		UserData128:     types.ToUint128(kafkaMsg.IdUsuarioFinal), // permite filtrar por usuario en QueryTransfers
+		UserData128:     types.ToUint128(kafkaMsg.IdUsuarioFinal),
 		UserData64:      kafkaMsg.IdCategoria,
 		UserData32:      timeStampUint32,
 	}
@@ -251,7 +250,7 @@ func (c *Consumidor) parseKafkaMessage(msg kafka.Message) (types.Transfer, model
 }
 
 // --------------------------------------------------------------------------------
-// Helpers de parámetros DB
+// Funciones Aux
 // --------------------------------------------------------------------------------
 
 func obtenerTamanoLoteKafka() int {
@@ -290,8 +289,10 @@ func obtenerRetryMaxBackoff() time.Duration {
 	return time.Duration(val) * time.Second
 }
 
-// construye una transferencia de reversión a partir de la original en TigerBeetle.
-// (invierte las cuentas debit/credit, mismo monto, y guarda id original en userdata128)
+// construye una transferencia de reversión a partir de la original en TigerBeetle:
+// invierte las cuentas debit/credit
+// mismo monto
+// guarda id original en userdata128
 func (c *Consumidor) buildReversion(idOriginal types.Uint128, kafkaMsg models.KafkaTransferencias) (types.Transfer, models.KafkaTransferencias, error) {
 	if persistence.ClienteTB == nil {
 		return types.Transfer{}, kafkaMsg, errors.New("Conexión a TigerBeetle no inicializada")

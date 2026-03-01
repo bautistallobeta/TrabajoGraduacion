@@ -24,18 +24,7 @@ type Cuentas struct {
 
 const limiteHistorialBalancesPorDefecto uint32 = 100
 
-func obtenerLimiteHistorialBalances() uint32 {
-	p := &Parametros{Parametro: "LIMITEHISTORIALBALANCE"}
-	if _, err := p.Dame(); err != nil || p.Valor == "" {
-		return limiteHistorialBalancesPorDefecto
-	}
-	val, err := strconv.ParseUint(p.Valor, 10, 32)
-	if err != nil {
-		return limiteHistorialBalancesPorDefecto
-	}
-	return uint32(val)
-}
-
+// Instancia los datos de la cuenta leyendo desde TigerBeetle a partir de IdUsuarioFinal e IdMoneda
 func (c *Cuentas) Dame() error {
 	if c.IdUsuarioFinal <= 0 || c.IdMoneda <= 0 {
 		return errors.New("IdUsuarioFinal e IdMoneda son requeridos y deben ser mayores a cero")
@@ -92,6 +81,11 @@ func (c *Cuentas) Dame() error {
 	return nil
 }
 
+// Busca las transferencias asociadas a la cuenta (como débito o crédito) en un rango de fechas, con un límite máximo de resultados
+// Ordena de la más reciente a la más antigua (por Timestamp de TB)
+// - FechaInicio: timestamp mínimo (inclusive) de las transferencias a buscar
+// - FechaFin: timestamp máximo (inclusive) de las transferencias a buscar
+// - Limite: cantidad máxima de transferencias a retornar (si es 0, se usa un valor por defecto)
 func (c *Cuentas) BuscarTransferenciasCuenta(FechaInicio uint64, FechaFin uint64, Limite uint32) ([]types.Transfer, error) {
 	if c.IdUsuarioFinal <= 0 || c.IdMoneda <= 0 {
 		return nil, errors.New("IdUsuarioFinal e IdMoneda son requeridos y deben ser mayores a cero")
@@ -116,12 +110,17 @@ func (c *Cuentas) BuscarTransferenciasCuenta(FechaInicio uint64, FechaFin uint64
 		TimestampMin: FechaInicio,
 		TimestampMax: FechaFin,
 		Limit:        Limite,
-		Flags:        7, // Debits(1) + Credits(2) + Reversed(4) → más reciente primero
+		Flags:        7, // Debits(1) + Credits(2) + Reversed(4)
 	}
 
 	return persistence.ClienteTB.GetAccountTransfers(filtro)
 }
 
+// Busca el historial de balances de la cuenta en un rango de fechas, con un límite máximo de resultados
+// Ordena de la más reciente a la más antigua (por Timestamp de TB)
+// - FechaInicio: timestamp mínimo (inclusive) de los balances a buscar
+// - FechaFin: timestamp máximo (inclusive) de los balances a buscar
+// - Limite: cantidad máxima de balances a retornar (si es 0, se usa un valor por defecto)
 func (c *Cuentas) DameHistorialBalances(FechaInicio uint64, FechaFin uint64, Limite uint32) ([]types.AccountBalance, error) {
 	if c.IdUsuarioFinal <= 0 || c.IdMoneda <= 0 {
 		return nil, errors.New("IdUsuarioFinal e IdMoneda son requeridos y deben ser mayores a cero")
@@ -154,4 +153,19 @@ func (c *Cuentas) DameHistorialBalances(FechaInicio uint64, FechaFin uint64, Lim
 		return nil, err
 	}
 	return balances, nil
+}
+
+// --------------------------------------------------------------------------------
+// Funciones aux
+// --------------------------------------------------------------------------------
+func obtenerLimiteHistorialBalances() uint32 {
+	p := &Parametros{Parametro: "LIMITEHISTORIALBALANCE"}
+	if _, err := p.Dame(); err != nil || p.Valor == "" {
+		return limiteHistorialBalancesPorDefecto
+	}
+	val, err := strconv.ParseUint(p.Valor, 10, 32)
+	if err != nil {
+		return limiteHistorialBalancesPorDefecto
+	}
+	return uint32(val)
 }

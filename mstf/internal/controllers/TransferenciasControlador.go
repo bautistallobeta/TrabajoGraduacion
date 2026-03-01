@@ -71,7 +71,6 @@ func (tc *TransferenciasControlador) Crear(c echo.Context) error {
 		return c.JSON(http.StatusInternalServerError, models.NewErrorRespuesta("Error al publicar en Kafka: "+utils.SanitizarError(err)))
 	}
 
-	// 202 Accepted (está encolada en kafka pendiente de ser procesada)
 	return c.JSON(http.StatusAccepted, map[string]interface{}{
 		"Mensaje": "Transferencia aceptada y encolada en Kafka.",
 		"Id":      req.IdTransferencia,
@@ -79,7 +78,7 @@ func (tc *TransferenciasControlador) Crear(c echo.Context) error {
 }
 
 func (tc *TransferenciasControlador) Buscar(c echo.Context) error {
-	// IdsTransferencia: array de IDs (repeated query param). Si se recibe, camino directo LookupTransfers.
+	// IdsTransferencia: array de IDs - si se recibe, camino directo LookupTransfers.
 	idsStr := c.QueryParams()["IdsTransferencia"]
 	var idsTransferencia []types.Uint128
 	if len(idsStr) > 0 {

@@ -10,14 +10,13 @@ type item[T any] struct {
 	expiracion time.Time
 }
 
-// Cachein-memory genérico, thread-safe, con TTL.
+// Cachein-memory genérico, thread-safe, con TTL
 type Cache[T any] struct {
 	mu    sync.RWMutex
 	items map[string]item[T]
 	ttl   time.Duration
 }
 
-// crea un caché con el TTL indicado.
 func NewCache[T any](ttl time.Duration) *Cache[T] {
 	return &Cache[T]{
 		items: make(map[string]item[T]),

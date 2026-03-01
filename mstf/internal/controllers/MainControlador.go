@@ -13,5 +13,5 @@ func NewMainControlador() *MainControlador {
 }
 
 func (mc *MainControlador) Ping(c echo.Context) error {
-	return c.String(http.StatusOK, "Hola Mundo desde API MSTF.")
+	return c.String(http.StatusOK, "API MSTF corriendo.")
 }
