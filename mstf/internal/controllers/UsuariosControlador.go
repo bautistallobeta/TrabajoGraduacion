@@ -102,7 +102,8 @@ func (uc *UsuariosControlador) ModificarPassword(c echo.Context) error {
 	if req.PasswordNuevo != req.ConfirmarPassword {
 		return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta("La confirmación de la nueva contraseña no coincide"))
 	}
-	mensaje, err := uc.Gestor.ModificarPassword(c.Request().Context(), utils.MD5Hash(req.PasswordAnterior), utils.MD5Hash(req.PasswordNuevo), utils.MD5Hash(req.ConfirmarPassword))
+	u := models.Usuarios{}
+	mensaje, err := u.ModificarPassword(c.Request().Context(), utils.MD5Hash(req.PasswordAnterior), utils.MD5Hash(req.PasswordNuevo), utils.MD5Hash(req.ConfirmarPassword))
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, models.NewErrorRespuesta("Error al modificar contraseña: "+utils.SanitizarError(err)))
 	}
@@ -123,7 +124,15 @@ func (uc *UsuariosControlador) ReestablecerPassword(c echo.Context) error {
 	if req.IdUsuario <= 0 {
 		return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta("IdUsuario es campo obligatorio"))
 	}
-	mensaje, passTemporal, err := uc.Gestor.RestablecerPassword(models.Usuarios{IdUsuario: req.IdUsuario})
+	u := models.Usuarios{IdUsuario: req.IdUsuario}
+	res, err := u.Dame()
+	if res != "OK" {
+		return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta("Error al obtener usuario: "+res))
+	}
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, models.NewErrorRespuesta("Error al obtener usuario: "+utils.SanitizarError(err)))
+	}
+	mensaje, passTemporal, err := u.RestablecerPassword()
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, models.NewErrorRespuesta("Error al restablecer contraseña: "+utils.SanitizarError(err)))
 	}

@@ -74,36 +74,3 @@ func (gu *GestorUsuarios) Borrar(ctx context.Context, Usuario models.Usuarios) (
 	}
 	return mensaje, nil
 }
-
-// Permite al usuario modificar su contraseña.
-// tsp_modificar_password_usuario
-// - PasswordAnterior: contraseña actual hasheada con md5
-// - PasswordNuevo: nueva contraseña hasheada con md5
-// - ConfirmarPassword: confirmación de la nueva contraseña hasheada con md5
-func (gu *GestorUsuarios) ModificarPassword(ctx context.Context, PasswordAnterior string, PasswordNuevo string, ConfirmarPassword string) (string, error) {
-	credencial, _ := auth.CredencialDesdeCtx(ctx)
-	var mensaje string
-	err := persistence.ClienteMySQL.QueryRow("CALL tsp_modificar_password_usuario(?, ?, ?, ?)", credencial, PasswordAnterior, PasswordNuevo, ConfirmarPassword).Scan(&mensaje)
-	if err != nil {
-		return "", err
-	}
-	return mensaje, nil
-}
-
-// Permite a un administrador logueado restablecer la contraseña de otro usuario.
-// tsp_restablecer_password_usuario
-// - Usuario.IdUsuario: ID del usuario al que se le restablecerá la contraseña
-func (gu *GestorUsuarios) RestablecerPassword(Usuario models.Usuarios) (string, string, error) {
-	var mensaje string
-	var passwordTemporal sql.NullString
-	err := persistence.ClienteMySQL.QueryRow("CALL tsp_restablecer_password_usuario(?)", Usuario.IdUsuario).Scan(&mensaje, &passwordTemporal)
-	if err != nil {
-		return "", "", err
-	}
-
-	if !passwordTemporal.Valid {
-		return mensaje, "", nil
-	}
-
-	return mensaje, passwordTemporal.String, nil
-}
