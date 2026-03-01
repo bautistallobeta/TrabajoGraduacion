@@ -28,17 +28,17 @@ type LoteNotificado struct {
 
 // Crear una notif a partir de una Transferencia, su mensaje Kafka original y su resultado de TigerBeetle.
 // Si TB devuelve TransferExists, la transfer se reporta como exitosa con mensaje
-// "TransferOKAlreadyProcessed": ya fue procesada en un intento anterior (idempotencia ante reintentos).
+// "OK - Reintento": ya fue procesada en un intento anterior (idempotencia ante reintentos).
 func NewTransferenciaNotificada(transfer types.Transfer, kafkaMsg KafkaTransferencias, result types.TransferEventResult) TransferenciaNotificada {
 	var estado, mensaje string
 	switch result.Result {
 	case types.TransferOK:
 		estado = "F"
-		mensaje = "TransferOK"
+		mensaje = "OK"
 	case types.TransferExists:
 		// Idempotencia: registrada en TB exitosamente, pero se indica que hubo reintento de algun lado
 		estado = "F"
-		mensaje = "TransferOKAlreadyProcessed"
+		mensaje = "OK - Reintento"
 	default:
 		estado = "E"
 		mensaje = result.Result.String()
