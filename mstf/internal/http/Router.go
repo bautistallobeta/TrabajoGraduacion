@@ -10,10 +10,9 @@ import (
 	"MSTransaccionesFinancieras/internal/gestores"
 	httpMiddleware "MSTransaccionesFinancieras/internal/http/middlewares"
 	"MSTransaccionesFinancieras/internal/infra/kafkamstf"
-	"MSTransaccionesFinancieras/internal/infra/webhook"
 )
 
-func InitRouter(notificador *webhook.Notificador, productor *kafkamstf.ProductorKafka) *echo.Echo {
+func InitRouter(productor *kafkamstf.ProductorKafka) *echo.Echo {
 	e := echo.New()
 	e.HideBanner = true
 
@@ -30,16 +29,16 @@ func InitRouter(notificador *webhook.Notificador, productor *kafkamstf.Productor
 		}),
 	)
 
-	initRoutes(e, notificador, productor)
+	initRoutes(e, productor)
 
 	return e
 }
 
-func initRoutes(router *echo.Echo, notificador *webhook.Notificador, productor *kafkamstf.ProductorKafka) {
+func initRoutes(router *echo.Echo, productor *kafkamstf.ProductorKafka) {
 	// Inicializac de controladores
 	mainControlador := controllers.NewMainControlador()
 	gestorCuentas := gestores.NewGestorCuentas()
-	gestorTransferencias := gestores.NewGestorTransferencias(notificador)
+	gestorTransferencias := gestores.NewGestorTransferencias()
 	cuentasControlador := controllers.NewCuentasControlador(gestorCuentas)
 	transferenciasControlador := controllers.NewTransferenciasControlador(gestorTransferencias, productor)
 	gestorUsuarios := gestores.NewGestorUsuarios()

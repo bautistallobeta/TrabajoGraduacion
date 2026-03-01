@@ -42,10 +42,10 @@ func main() {
 	}
 
 	// Notificador Webhook
-	notificador := webhook.NewNotificador(cfg)
+	webhook.Init(cfg)
 
 	// Gestor de Transferencias
-	gestorTransferencias := gestores.NewGestorTransferencias(notificador)
+	gestorTransferencias := gestores.NewGestorTransferencias()
 
 	// Consumidor Kafka
 	consumidor := kafkamstf.NewConsumidor(cfg, gestorTransferencias)
@@ -58,7 +58,7 @@ func main() {
 	}
 
 	// Inicializar router HTTP
-	e := httpRouter.InitRouter(notificador, productor)
+	e := httpRouter.InitRouter(productor)
 
 	// Arranque del server
 	go func() {

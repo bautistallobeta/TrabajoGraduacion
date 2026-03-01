@@ -14,13 +14,10 @@ import (
 )
 
 type GestorTransferencias struct {
-	notificador *webhook.Notificador
 }
 
-func NewGestorTransferencias(notificador *webhook.Notificador) *GestorTransferencias {
-	return &GestorTransferencias{
-		notificador: notificador,
-	}
+func NewGestorTransferencias() *GestorTransferencias {
+	return &GestorTransferencias{}
 }
 
 // Bbusca transferencias según los filtros especificados.
@@ -134,7 +131,7 @@ func (gt *GestorTransferencias) BuscarAvanzado(
 // Valida reglas de negocio antes de enviar a TigerBeetle.
 // Las transferencias que fallan validación no van a TB pero sí se notifican con su error.
 // FallidasParseo son transferencias que fallaron en el parseo del mensaje Kafka (también se notifican)
-func (gt *GestorTransferencias) ProcesarLote(Batch []types.Transfer, KafkaMsgs []models.KafkaTransferencias, FallidasParseo []models.TransferenciaNotificada) error {
+func (gt *GestorTransferencias) CrearLote(Batch []types.Transfer, KafkaMsgs []models.KafkaTransferencias, FallidasParseo []models.TransferenciaNotificada) error {
 	var paraEnviar []types.Transfer
 	var kafkaMsgsValidos []models.KafkaTransferencias
 	fallidas := append([]models.TransferenciaNotificada{}, FallidasParseo...)
@@ -143,7 +140,7 @@ func (gt *GestorTransferencias) ProcesarLote(Batch []types.Transfer, KafkaMsgs [
 	erroresCuentas, err := gt.preValidarCuentas(Batch)
 	if err != nil {
 		// error de infraestructura (TB caído): no notificar, dejar que procesarConRetry reintente
-		log.Printf("ERROR [GestorTransferencias.ProcesarLote]: Error de infraestructura en preValidarCuentas: %v", err)
+		log.Printf("ERROR [GestorTransferencias.CrearLote]: Error de infraestructura en preValidarCuentas: %v", err)
 		return err
 	}
 
@@ -160,7 +157,7 @@ func (gt *GestorTransferencias) ProcesarLote(Batch []types.Transfer, KafkaMsgs [
 			var errInfra error
 			estadoError, errInfra = gt.validarReversion(t, KafkaMsgs[i])
 			if errInfra != nil {
-				log.Printf("ERROR [GestorTransferencias.ProcesarLote]: Error de infraestructura en validarReversion: %v", errInfra)
+				log.Printf("ERROR [GestorTransferencias.CrearLote]: Error de infraestructura en validarReversion: %v", errInfra)
 				return errInfra
 			}
 		} else {
@@ -187,7 +184,7 @@ func (gt *GestorTransferencias) ProcesarLote(Batch []types.Transfer, KafkaMsgs [
 		var err error
 		results, err = persistence.ClienteTB.CreateTransfers(paraEnviar)
 		if err != nil {
-			log.Printf("ERROR [GestorTransferencias.ProcesarLote]: Error de comunicación con TigerBeetle al enviar batch de %d transfers: %v", len(paraEnviar), err)
+			log.Printf("ERROR [GestorTransferencias.CrearLote]: Error de comunicación con TigerBeetle al enviar batch de %d transfers: %v", len(paraEnviar), err)
 			return err
 		}
 
@@ -207,8 +204,8 @@ func (gt *GestorTransferencias) ProcesarLote(Batch []types.Transfer, KafkaMsgs [
 	}
 
 	// Notificar todo: resultados de TB + rechazadas
-	if err := gt.notificador.NotificarTransferencias(paraEnviar, kafkaMsgsValidos, results, fallidas); err != nil {
-		log.Printf("ERROR [GestorTransferencias.ProcesarLote]: Falló la notificación del Webhook: %v", err)
+	if err := webhook.Cliente.NotificarTransferencias(paraEnviar, kafkaMsgsValidos, results, fallidas); err != nil {
+		log.Printf("ERROR [GestorTransferencias.CrearLote]: Falló la notificación del Webhook: %v", err)
 		return err
 	}
 

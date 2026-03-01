@@ -92,7 +92,7 @@ func (c *Consumidor) batchLoop() {
 	}
 }
 
-// llama a ProcesarLote con backoff exponencial hasta que tenga éxito.
+// llama a CrearLote con backoff exponencial hasta que tenga éxito.
 // El backoff empieza en 1s y se duplica en cada intento hasta el límite RETRY_MAX_BACKOFF_SECONDS.
 // Nunca abandona, bloquea hasta que el servicio caído (TB, webhook, etc.) se recupere.
 // Retorna error solo si el consumidor es detenido vía stopChan durante el espera.
@@ -107,7 +107,7 @@ func (c *Consumidor) procesarConRetry(
 	maxBackoff := obtenerRetryMaxBackoff()
 
 	for {
-		err := c.procesador.ProcesarLote(transferenciasLote, kafkaMsgsLote, fallidasParseo)
+		err := c.procesador.CrearLote(transferenciasLote, kafkaMsgsLote, fallidasParseo)
 		if err == nil {
 			// Commit de offsets en Kafka (solo llega hasta acá si el procesamiento fue exitoso)
 			log.Printf("Lote procesado exitosamente. Haciendo commit de %d offsets en Kafka.", len(mensajesLote))

@@ -18,8 +18,10 @@ type Notificador struct {
 	cfg config.Config
 }
 
-func NewNotificador(cfg config.Config) *Notificador {
-	return &Notificador{cfg: cfg}
+var Cliente *Notificador
+
+func Init(cfg config.Config) {
+	Cliente = &Notificador{cfg: cfg}
 }
 
 func (n *Notificador) NotificarTransferencias(transfers []types.Transfer, kafkaMsgs []models.KafkaTransferencias, results []types.TransferEventResult, fallidas []models.TransferenciaNotificada) error {
