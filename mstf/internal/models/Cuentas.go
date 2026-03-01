@@ -2,7 +2,10 @@ package models
 
 import (
 	"errors"
+	"fmt"
+	"log"
 	"strconv"
+	"time"
 
 	"MSTransaccionesFinancieras/internal/infra/persistence"
 	"MSTransaccionesFinancieras/internal/utils"
@@ -153,6 +156,162 @@ func (c *Cuentas) DameHistorialBalances(FechaInicio uint64, FechaFin uint64, Lim
 		return nil, err
 	}
 	return balances, nil
+}
+
+// Cierra una cuenta en TigerBeetle creando un pending transfer con closing_debit.
+// La cuenta empresa de la moneda actúa como cuenta crédito (monto 0, no se transfiere dinero).
+// Idempotente: si la cuenta ya está cerrada, retorna nil.
+func (c *Cuentas) Desactivar() error {
+	idMoneda := c.IdMoneda
+	idUsuarioFinal := c.IdUsuarioFinal
+
+	if persistence.ClienteTB == nil {
+		return errors.New("Conexión a TigerBeetle no inicializada")
+	}
+
+	moneda := &Monedas{IdMoneda: int(idMoneda)}
+	if _, err := moneda.Dame(); err != nil {
+		return errors.New("La moneda no existe o no está activa")
+	}
+	if moneda.Estado != "A" || moneda.IdCuentaEmpresa == "" {
+		return errors.New("La moneda no existe o no está activa")
+	}
+
+	idCuentaEmpresa, err := utils.ParsearUint128(moneda.IdCuentaEmpresa)
+	if err != nil {
+		return errors.New("IdCuentaEmpresa formato incorrecto")
+	}
+
+	idCuentaStr := utils.ConcatenarIDString(uint64(idMoneda), idUsuarioFinal)
+	idCuenta, err := utils.ParsearUint128(idCuentaStr)
+	if err != nil {
+		return errors.New("Error al construir IdCuenta")
+	}
+
+	accounts, err := persistence.ClienteTB.LookupAccounts([]types.Uint128{idCuenta})
+	if err != nil {
+		return errors.New("error de comunicación con TigerBeetle")
+	}
+	if len(accounts) == 0 {
+		return errors.New("Cuenta no encontrada")
+	}
+
+	flagCerrada := types.AccountFlags{Closed: true}.ToUint16()
+	if (accounts[0].Flags & flagCerrada) != 0 {
+		log.Printf("GestorCuentas.Desactivar: cuenta %s ya estaba cerrada", idCuentaStr)
+		return nil
+	}
+
+	// ID único: high=timestamp nanosegundos, low=idUsuarioFinal
+	// No colisiona con transfers normales (64 MSBits=0000...0) ni reversiones (64 MSBits=0000...1)
+	idCierreStr := utils.ConcatenarIDString(uint64(time.Now().UnixNano()), idUsuarioFinal)
+	idCierreTB, err := utils.ParsearUint128(idCierreStr)
+	if err != nil {
+		return errors.New("Error al generar ID de closing transfer")
+	}
+
+	closingTransfer := types.Transfer{
+		ID:              idCierreTB,
+		DebitAccountID:  idCuenta,
+		CreditAccountID: idCuentaEmpresa,
+		Amount:          types.ToUint128(0),
+		Ledger:          idMoneda,
+		Code:            CodigoTransferenciaCierre,
+		Flags: types.TransferFlags{
+			Pending:      true,
+			ClosingDebit: true,
+		}.ToUint16(),
+	}
+
+	results, err := persistence.ClienteTB.CreateTransfers([]types.Transfer{closingTransfer})
+	if err != nil {
+		return errors.New("error de comunicación con TigerBeetle")
+	}
+	if len(results) > 0 {
+		return fmt.Errorf("error al desactivar cuenta: %s", results[0].Result.String())
+	}
+
+	log.Printf("GestorCuentas.Desactivar: cuenta %s desactivada exitosamente", idCuentaStr)
+	return nil
+}
+
+// Reabre una cuenta cerrada en TigerBeetle voidando el closing pending transfer.
+// Busca la transfer de cierre como la más reciente en débito de la cuenta (la única posible
+// tras el cierre, ya que TB rechaza nuevas transfers sobre cuentas cerradas).
+// Idempotente: si la cuenta ya está activa, retorna nil.
+func (c *Cuentas) Activar() error {
+	idMoneda := c.IdMoneda
+	idUsuarioFinal := c.IdUsuarioFinal
+
+	if persistence.ClienteTB == nil {
+		return errors.New("Conexión a TigerBeetle no inicializada")
+	}
+
+	idCuentaStr := utils.ConcatenarIDString(uint64(idMoneda), idUsuarioFinal)
+	idCuenta, err := utils.ParsearUint128(idCuentaStr)
+	if err != nil {
+		return errors.New("Error al construir IdCuenta")
+	}
+
+	accounts, err := persistence.ClienteTB.LookupAccounts([]types.Uint128{idCuenta})
+	if err != nil {
+		return errors.New("error de comunicación con TigerBeetle")
+	}
+	if len(accounts) == 0 {
+		return errors.New("Cuenta no encontrada")
+	}
+
+	flagCerrada := types.AccountFlags{Closed: true}.ToUint16()
+	if (accounts[0].Flags & flagCerrada) == 0 {
+		log.Printf("GestorCuentas.Activar: cuenta %s ya estaba activa", idCuentaStr)
+		return nil
+	}
+
+	// La transfer más reciente en débito debe ser el closing pending transfer
+	// (Aunque igualmente TB no admite nuevas transfers sobre cuentas cerradas)
+	filtro := types.AccountFilter{
+		AccountID: idCuenta,
+		Limit:     1,
+		Flags:     5, // Debits(1) + Reversed(4)
+	}
+	transfers, err := persistence.ClienteTB.GetAccountTransfers(filtro)
+	if err != nil {
+		return errors.New("error de comunicación con TigerBeetle")
+	}
+	if len(transfers) == 0 {
+		return errors.New("No se encontró el closing transfer de la cuenta")
+	}
+
+	closingTransfer := transfers[0]
+	flagPending := types.TransferFlags{Pending: true}.ToUint16()
+	if (closingTransfer.Flags & flagPending) == 0 {
+		return errors.New("La transfer de cierre no está en estado pendiente")
+	}
+
+	// ID único para el void transfer
+	idVoidStr := utils.ConcatenarIDString(uint64(time.Now().UnixNano()), idUsuarioFinal)
+	idVoidTB, err := utils.ParsearUint128(idVoidStr)
+	if err != nil {
+		return errors.New("Error al generar ID de void transfer")
+	}
+
+	voidTransfer := types.Transfer{
+		ID:        idVoidTB,
+		PendingID: closingTransfer.ID,
+		Code:      CodigoTransferenciaCierre, // mismo code que el closing
+		Flags:     types.TransferFlags{VoidPendingTransfer: true}.ToUint16(),
+	}
+
+	results, err := persistence.ClienteTB.CreateTransfers([]types.Transfer{voidTransfer})
+	if err != nil {
+		return errors.New("error de comunicación con TigerBeetle")
+	}
+	if len(results) > 0 {
+		return fmt.Errorf("error al activar cuenta: %s", results[0].Result.String())
+	}
+
+	log.Printf("GestorCuentas.Activar: cuenta %s activada exitosamente", idCuentaStr)
+	return nil
 }
 
 // --------------------------------------------------------------------------------

@@ -268,7 +268,9 @@ func (cc *CuentasControlador) Desactivar(c echo.Context) error {
 		return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta("IdUsuarioFinal e IdMoneda son requeridos y deben ser mayores a cero"))
 	}
 
-	if err := cc.Gestor.Desactivar(models.Cuentas{IdMoneda: req.IdMoneda, IdUsuarioFinal: req.IdUsuarioFinal}); err != nil {
+	cuenta := models.Cuentas{IdMoneda: req.IdMoneda, IdUsuarioFinal: req.IdUsuarioFinal}
+	cuenta.Dame()
+	if err := cuenta.Desactivar(); err != nil {
 		return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta("Error al desactivar cuenta: "+utils.SanitizarError(err)))
 	}
 	return c.JSON(http.StatusOK, map[string]interface{}{
@@ -289,8 +291,9 @@ func (cc *CuentasControlador) Activar(c echo.Context) error {
 	if req.IdUsuarioFinal <= 0 || req.IdMoneda <= 0 {
 		return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta("IdUsuarioFinal e IdMoneda son requeridos y deben ser mayores a cero"))
 	}
-
-	if err := cc.Gestor.Activar(models.Cuentas{IdMoneda: req.IdMoneda, IdUsuarioFinal: req.IdUsuarioFinal}); err != nil {
+	cuenta := models.Cuentas{IdMoneda: req.IdMoneda, IdUsuarioFinal: req.IdUsuarioFinal}
+	cuenta.Dame()
+	if err := cuenta.Activar(); err != nil {
 		return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta("Error al activar cuenta: "+utils.SanitizarError(err)))
 	}
 	return c.JSON(http.StatusOK, map[string]interface{}{
