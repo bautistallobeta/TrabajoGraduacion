@@ -89,7 +89,7 @@ func (c *Cuentas) Dame() error {
 // - FechaInicio: timestamp mínimo (inclusive) de las transferencias a buscar
 // - FechaFin: timestamp máximo (inclusive) de las transferencias a buscar
 // - Limite: cantidad máxima de transferencias a retornar (si es 0, se usa un valor por defecto)
-func (c *Cuentas) BuscarTransferenciasCuenta(FechaInicio uint64, FechaFin uint64, Limite uint32) ([]types.Transfer, error) {
+func (c *Cuentas) ListarTransferenciasCuenta(FechaInicio uint64, FechaFin uint64, Limite uint32) ([]types.Transfer, error) {
 	if c.IdUsuarioFinal <= 0 || c.IdMoneda <= 0 {
 		return nil, errors.New("IdUsuarioFinal e IdMoneda son requeridos y deben ser mayores a cero")
 	}
@@ -124,7 +124,7 @@ func (c *Cuentas) BuscarTransferenciasCuenta(FechaInicio uint64, FechaFin uint64
 // - FechaInicio: timestamp mínimo (inclusive) de los balances a buscar
 // - FechaFin: timestamp máximo (inclusive) de los balances a buscar
 // - Limite: cantidad máxima de balances a retornar (si es 0, se usa un valor por defecto)
-func (c *Cuentas) DameHistorialBalances(FechaInicio uint64, FechaFin uint64, Limite uint32) ([]types.AccountBalance, error) {
+func (c *Cuentas) ListarHistorialBalances(FechaInicio uint64, FechaFin uint64, Limite uint32) ([]types.AccountBalance, error) {
 	if c.IdUsuarioFinal <= 0 || c.IdMoneda <= 0 {
 		return nil, errors.New("IdUsuarioFinal e IdMoneda son requeridos y deben ser mayores a cero")
 	}

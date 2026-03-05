@@ -14,6 +14,7 @@ type Usuarios struct {
 	TokenSesion            string `json:"TokenSesion"`
 	FechaAlta              string `json:"FechaAlta"`
 	Estado                 string `json:"Estado"`
+	Rol                    string `json:"Rol"`
 	RequiereCambioPassword string `json:"RequiereCambioPassword"`
 }
 
@@ -29,8 +30,9 @@ func (u *Usuarios) Dame() (string, error) {
 	var usuario sql.NullString
 	var fechaAlta sql.NullString
 	var estado sql.NullString
+	var rol sql.NullString
 	if rows.Next() {
-		err = rows.Scan(&mensaje, &u.IdUsuario, &usuario, &fechaAlta, &estado)
+		err = rows.Scan(&mensaje, &u.IdUsuario, &usuario, &fechaAlta, &estado, &rol)
 		if err != nil {
 			return mensaje, err
 		}
@@ -48,6 +50,11 @@ func (u *Usuarios) Dame() (string, error) {
 			u.Estado = estado.String
 		} else {
 			u.Estado = ""
+		}
+		if rol.Valid {
+			u.Rol = rol.String
+		} else {
+			u.Rol = ""
 		}
 	}
 	return mensaje, nil
@@ -69,8 +76,9 @@ func (u *Usuarios) Login(Usuario string, Password string) (string, string, error
 	var tokenSesion sql.NullString
 	var requiereCambioPassword sql.NullString
 	var estado sql.NullString
+	var rol sql.NullString
 	if rows.Next() {
-		err = rows.Scan(&mensaje, &u.IdUsuario, &usr, &tokenSesion, &requiereCambioPassword, &fechaAlta, &estado)
+		err = rows.Scan(&mensaje, &u.IdUsuario, &usr, &tokenSesion, &requiereCambioPassword, &fechaAlta, &estado, &rol)
 		if err != nil {
 			return "", "", err
 		}
@@ -101,6 +109,11 @@ func (u *Usuarios) Login(Usuario string, Password string) (string, string, error
 			u.Estado = estado.String
 		} else {
 			u.Estado = ""
+		}
+		if rol.Valid {
+			u.Rol = rol.String
+		} else {
+			u.Rol = ""
 		}
 
 		return mensaje, u.TokenSesion, nil
@@ -154,13 +167,26 @@ func (u *Usuarios) ModificarPassword(ctx context.Context, PasswordAnterior strin
 	return mensaje, nil
 }
 
+// Permite al usuario activo cerrar su sesión, invalidando su token actual.
+// tsp_logout_usuario
+func (u *Usuarios) Logout(ctx context.Context) (string, error) {
+	credencial, _ := auth.CredencialDesdeCtx(ctx)
+	var mensaje string
+	err := persistence.ClienteMySQL.QueryRow("CALL tsp_logout_usuario(?)", credencial).Scan(&mensaje)
+	if err != nil {
+		return "", err
+	}
+	return mensaje, nil
+}
+
 // Permite a un administrador logueado restablecer la contraseña de otro usuario.
 // tsp_restablecer_password_usuario
 // - Usuario.IdUsuario: ID del usuario al que se le restablecerá la contraseña
-func (u *Usuarios) RestablecerPassword() (string, string, error) {
+func (u *Usuarios) RestablecerPassword(ctx context.Context) (string, string, error) {
+	credencial, actor := auth.CredencialDesdeCtx(ctx)
 	var mensaje string
 	var passwordTemporal sql.NullString
-	err := persistence.ClienteMySQL.QueryRow("CALL tsp_restablecer_password_usuario(?)", u.IdUsuario).Scan(&mensaje, &passwordTemporal)
+	err := persistence.ClienteMySQL.QueryRow("CALL tsp_restablecer_password_usuario(?, ?, ?)", u.IdUsuario, credencial, actor).Scan(&mensaje, &passwordTemporal)
 	if err != nil {
 		return "", "", err
 	}

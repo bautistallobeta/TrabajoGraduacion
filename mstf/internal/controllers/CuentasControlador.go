@@ -110,7 +110,7 @@ func (cc *CuentasControlador) DameHistorial(c echo.Context) error {
 
 	//obtener historial
 	cuenta := &models.Cuentas{IdUsuarioFinal: req.IdUsuarioFinal, IdMoneda: req.IdMoneda}
-	balances, err := cuenta.DameHistorialBalances(timestampMin, timestampMax, limite)
+	balances, err := cuenta.ListarHistorialBalances(timestampMin, timestampMax, limite)
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, models.NewErrorRespuesta("Error al obtener historial: "+utils.SanitizarError(err)))
 	}
@@ -196,7 +196,7 @@ func (cc *CuentasControlador) DameTransferencias(c echo.Context) error {
 	}
 
 	cuenta := &models.Cuentas{IdUsuarioFinal: req.IdUsuarioFinal, IdMoneda: req.IdMoneda}
-	transferencias, err := cuenta.BuscarTransferenciasCuenta(timestampMin, timestampMax, limite)
+	transferencias, err := cuenta.ListarTransferenciasCuenta(timestampMin, timestampMax, limite)
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, models.NewErrorRespuesta("Error al obtener transferencias: "+utils.SanitizarError(err)))
 	}

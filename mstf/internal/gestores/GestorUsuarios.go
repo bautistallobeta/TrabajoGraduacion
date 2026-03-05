@@ -52,7 +52,7 @@ func (gu *GestorUsuarios) Buscar(Cadena string, IncluyeInactivos string) ([]*mod
 	var usuarios []*models.Usuarios
 	for rows.Next() {
 		var m models.Usuarios
-		err = rows.Scan(&m.IdUsuario, &m.Usuario, &m.FechaAlta, &m.Estado)
+		err = rows.Scan(&m.IdUsuario, &m.Usuario, &m.FechaAlta, &m.Estado, &m.Rol)
 		if err != nil {
 			return nil, err
 		}
@@ -62,7 +62,7 @@ func (gu *GestorUsuarios) Buscar(Cadena string, IncluyeInactivos string) ([]*mod
 	return usuarios, nil
 }
 
-// Permite eliminar un usuario siempre y cuando no tenga registros en Operaciones.
+// Permite eliminar un usuario siempre y cuando no tenga registros en Operaciones y se encuentre Inactivo.
 // tsp_borrar_usuario
 // - Usuario.IdUsuario: ID del usuario a eliminar
 func (gu *GestorUsuarios) Borrar(ctx context.Context, Usuario models.Usuarios) (string, error) {

@@ -125,7 +125,36 @@ func (mc *MonedasControlador) Borrar(c echo.Context) error {
 	if err := c.Bind(req); err != nil {
 		return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta("Parámetros inválidos: "+utils.SanitizarError(err)))
 	}
-	mensaje, err := mc.Gestor.Borrar(c.Request().Context(), models.Monedas{IdMoneda: req.IdMoneda})
+	if req.IdMoneda <= 0 {
+		return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta("IdMoneda es campo obligatorio"))
+	}
+
+	// Verificar que la moneda exista y obtener su IdCuentaEmpresa
+	moneda := &models.Monedas{IdMoneda: req.IdMoneda}
+	mensaje, err := moneda.Dame()
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, models.NewErrorRespuesta("Error al obtener moneda: "+utils.SanitizarError(err)))
+	}
+	if mensaje != "OK" {
+		return c.JSON(http.StatusNotFound, models.NewErrorRespuesta(mensaje))
+	}
+
+	// Verificar que no existan cuentas de usuario en esta moneda en TigerBeetle
+	cuentas, err := mc.GestorCuentas.BuscarAvanzado(nil, 0, uint32(req.IdMoneda), "", 2)
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, models.NewErrorRespuesta("Error al verificar cuentas: "+utils.SanitizarError(err)))
+	}
+	if len(cuentas) > 1 {
+		return c.JSON(http.StatusConflict, models.NewErrorRespuesta("No se puede borrar la moneda: existen cuentas de usuario asociadas"))
+	}
+	if len(cuentas) == 1 {
+		idCuentaEncontrada := utils.Uint128AStringDecimal(cuentas[0].ID)
+		if idCuentaEncontrada != moneda.IdCuentaEmpresa {
+			return c.JSON(http.StatusConflict, models.NewErrorRespuesta("No se puede borrar la moneda: existen cuentas de usuario asociadas"))
+		}
+	}
+
+	mensaje, err = mc.Gestor.Borrar(c.Request().Context(), models.Monedas{IdMoneda: req.IdMoneda})
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, models.NewErrorRespuesta("Error al borrar moneda: "+utils.SanitizarError(err)))
 	}

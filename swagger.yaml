@@ -864,7 +864,19 @@ paths:
                     type: string
                     example: "OK"
         '400':
-          description: Error al borrar
+          description: Error al borrar (ej. moneda no está en estado Inactivo)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Moneda no encontrada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Conflicto — existen cuentas de usuario asociadas a la moneda
           content:
             application/json:
               schema:
@@ -1554,6 +1566,39 @@ paths:
                     example: "Zq7!mNx2"
         '400':
           description: Error de negocio
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Error interno
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /usuarios/logout:
+    post:
+      tags: [Usuarios]
+      summary: Logout de usuario
+      description: |
+        Cierra la sesión activa del usuario autenticado.
+        Invalida el token actual rotándolo a un valor nuevo desconocido para el cliente;
+        cualquier llamada posterior con el mismo token será rechazada con 401.
+        Requiere autenticación Bearer (actor USUARIO).
+      responses:
+        '200':
+          description: Sesión cerrada exitosamente
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  Mensaje:
+                    type: string
+                    example: "OK"
+        '401':
+          description: No autenticado — token ausente, inválido o ya cerrado
           content:
             application/json:
               schema:

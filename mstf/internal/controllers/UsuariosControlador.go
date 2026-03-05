@@ -132,7 +132,7 @@ func (uc *UsuariosControlador) ReestablecerPassword(c echo.Context) error {
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, models.NewErrorRespuesta("Error al obtener usuario: "+utils.SanitizarError(err)))
 	}
-	mensaje, passTemporal, err := u.RestablecerPassword()
+	mensaje, passTemporal, err := u.RestablecerPassword(c.Request().Context())
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, models.NewErrorRespuesta("Error al restablecer contraseña: "+utils.SanitizarError(err)))
 	}
@@ -184,7 +184,7 @@ func (uc *UsuariosControlador) Login(c echo.Context) error {
 	if mensaje[:2] != "OK" {
 		return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta(mensaje))
 	}
-	return c.JSON(http.StatusOK, map[string]string{"Mensaje": mensaje, "TokenSesion": tokenSesion})
+	return c.JSON(http.StatusOK, map[string]string{"Mensaje": mensaje, "TokenSesion": tokenSesion, "Rol": usuario.Rol})
 }
 
 func (uc *UsuariosControlador) Activar(c echo.Context) error {
@@ -224,6 +224,18 @@ func (uc *UsuariosControlador) Desactivar(c echo.Context) error {
 	mensaje, err := usuario.Desactivar(c.Request().Context())
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, models.NewErrorRespuesta("Error al desactivar usuario: "+utils.SanitizarError(err)))
+	}
+	if mensaje != "OK" {
+		return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta(mensaje))
+	}
+	return c.JSON(http.StatusOK, map[string]string{"Mensaje": mensaje})
+}
+
+func (uc *UsuariosControlador) Logout(c echo.Context) error {
+	usuario := &models.Usuarios{}
+	mensaje, err := usuario.Logout(c.Request().Context())
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, models.NewErrorRespuesta("Error al cerrar sesión: "+utils.SanitizarError(err)))
 	}
 	if mensaje != "OK" {
 		return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta(mensaje))

@@ -69,6 +69,7 @@ func initRoutes(router *echo.Echo, productor *kafkamstf.ProductorKafka) {
 	router.GET("/usuarios", usuariosControlador.Buscar)
 	router.POST("/usuarios", usuariosControlador.Crear)
 	router.POST("/usuarios/login", usuariosControlador.Login)
+	router.POST("/usuarios/logout", usuariosControlador.Logout)
 	router.PUT("/usuarios/activar/:idusuario", usuariosControlador.Activar)
 	router.PUT("/usuarios/desactivar/:idusuario", usuariosControlador.Desactivar)
 	router.PUT("/usuarios/confirmar-cuenta/:idusuario", usuariosControlador.ConfirmarUsuario)
