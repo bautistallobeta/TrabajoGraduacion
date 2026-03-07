@@ -12,10 +12,9 @@ type Usuarios struct {
 	IdUsuario              int    `json:"IdUsuario"`
 	Usuario                string `json:"Usuario"`
 	TokenSesion            string `json:"TokenSesion"`
-	FechaAlta              string `json:"FechaAlta"`
-	Estado                 string `json:"Estado"`
-	Rol                    string `json:"Rol"`
-	RequiereCambioPassword string `json:"RequiereCambioPassword"`
+	FechaAlta   string `json:"FechaAlta"`
+	Estado      string `json:"Estado"`
+	Rol         string `json:"Rol"`
 }
 
 // Instancia un usuario específico por su ID.
@@ -74,11 +73,10 @@ func (u *Usuarios) Login(Usuario string, Password string) (string, string, error
 	var usr sql.NullString
 	var fechaAlta sql.NullString
 	var tokenSesion sql.NullString
-	var requiereCambioPassword sql.NullString
 	var estado sql.NullString
 	var rol sql.NullString
 	if rows.Next() {
-		err = rows.Scan(&mensaje, &u.IdUsuario, &usr, &tokenSesion, &requiereCambioPassword, &fechaAlta, &estado, &rol)
+		err = rows.Scan(&mensaje, &u.IdUsuario, &usr, &tokenSesion, &fechaAlta, &estado, &rol)
 		if err != nil {
 			return "", "", err
 		}
@@ -97,18 +95,13 @@ func (u *Usuarios) Login(Usuario string, Password string) (string, string, error
 		} else {
 			u.TokenSesion = ""
 		}
-		if requiereCambioPassword.Valid {
-			if requiereCambioPassword.String == "S" {
-				mensaje += " - Se requiere cambio de contraseña temporal"
-			}
-			u.RequiereCambioPassword = requiereCambioPassword.String
-		} else {
-			u.RequiereCambioPassword = ""
-		}
 		if estado.Valid {
 			u.Estado = estado.String
 		} else {
 			u.Estado = ""
+		}
+		if u.Estado == "P" {
+			mensaje += " - Se requiere cambio de contraseña temporal"
 		}
 		if rol.Valid {
 			u.Rol = rol.String

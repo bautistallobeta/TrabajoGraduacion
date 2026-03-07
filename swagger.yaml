@@ -183,10 +183,6 @@ components:
         TokenSesion:
           type: string
           example: "abc123token"
-        RequiereCambioPassword:
-          type: string
-          enum: [S, N]
-          example: "N"
 
 security:
   - BearerAuth: []
@@ -1233,7 +1229,7 @@ paths:
             type: string
             enum: [S, N]
             default: N
-          description: "S=incluye inactivos, N=solo activos"
+          description: "S=incluye inactivos y pendientes, N=solo activos"
       responses:
         '200':
           description: Lista de usuarios
