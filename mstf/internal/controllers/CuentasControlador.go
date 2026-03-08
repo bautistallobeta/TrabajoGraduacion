@@ -269,7 +269,12 @@ func (cc *CuentasControlador) Desactivar(c echo.Context) error {
 	}
 
 	cuenta := models.Cuentas{IdMoneda: req.IdMoneda, IdUsuarioFinal: req.IdUsuarioFinal}
-	cuenta.Dame()
+	if err := cuenta.Dame(); err != nil {
+		return c.JSON(http.StatusNotFound, models.NewErrorRespuesta("Cuenta no encontrada: "+utils.SanitizarError(err)))
+	}
+	if cuenta.Estado != "A" {
+		return c.JSON(http.StatusConflict, models.NewErrorRespuesta("La cuenta ya se encuentra inactiva"))
+	}
 	if err := cuenta.Desactivar(); err != nil {
 		return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta("Error al desactivar cuenta: "+utils.SanitizarError(err)))
 	}
@@ -292,7 +297,12 @@ func (cc *CuentasControlador) Activar(c echo.Context) error {
 		return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta("IdUsuarioFinal e IdMoneda son requeridos y deben ser mayores a cero"))
 	}
 	cuenta := models.Cuentas{IdMoneda: req.IdMoneda, IdUsuarioFinal: req.IdUsuarioFinal}
-	cuenta.Dame()
+	if err := cuenta.Dame(); err != nil {
+		return c.JSON(http.StatusNotFound, models.NewErrorRespuesta("Cuenta no encontrada: "+utils.SanitizarError(err)))
+	}
+	if cuenta.Estado != "I" {
+		return c.JSON(http.StatusConflict, models.NewErrorRespuesta("La cuenta ya se encuentra activa"))
+	}
 	if err := cuenta.Activar(); err != nil {
 		return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta("Error al activar cuenta: "+utils.SanitizarError(err)))
 	}
