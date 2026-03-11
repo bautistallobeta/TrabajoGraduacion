@@ -30,8 +30,6 @@ async function login() {
     })
     iniciarSesion(res.data.TokenSesion, form.value.usuario)
 
-    // Verificar si el token sirve para endpoints admin.
-    // Si devuelve 401, el usuario es Pendiente → redirigir a confirmar cuenta.
     try {
       await cliente.get('/parametros', { _noRedirect: true })
       router.push('/usuarios')
