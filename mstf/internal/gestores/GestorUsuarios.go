@@ -49,7 +49,7 @@ func (gu *GestorUsuarios) Buscar(Cadena string, IncluyeInactivos string) ([]*mod
 	}
 	defer rows.Close()
 
-	var usuarios []*models.Usuarios
+	usuarios := make([]*models.Usuarios, 0)
 	for rows.Next() {
 		var m models.Usuarios
 		err = rows.Scan(&m.IdUsuario, &m.Usuario, &m.FechaAlta, &m.Estado, &m.Rol)

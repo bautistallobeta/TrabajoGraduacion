@@ -39,7 +39,7 @@ func (gm *GestorMonedas) Listar(IncluyeInactivos string) ([]models.Monedas, erro
 	}
 	defer rows.Close()
 
-	var monedas []models.Monedas
+	monedas := make([]models.Monedas, 0)
 	for rows.Next() {
 		var m models.Monedas
 		err = rows.Scan(&m.IdMoneda, &m.IdCuentaEmpresa, &m.Estado, &m.FechaAlta)

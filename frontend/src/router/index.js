@@ -1,6 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { useAuth } from '../stores/auth'
 import LoginView from '../views/LoginView.vue'
+import ConfirmarCuentaView from '../views/ConfirmarCuentaView.vue'
 import AppLayout from '../components/AppLayout.vue'
 
 const router = createRouter({
@@ -10,6 +11,12 @@ const router = createRouter({
       path: '/login',
       name: 'login',
       component: LoginView,
+      meta: { publica: true }
+    },
+    {
+      path: '/confirmar-cuenta',
+      name: 'confirmar-cuenta',
+      component: ConfirmarCuentaView,
       meta: { publica: true }
     },
     {

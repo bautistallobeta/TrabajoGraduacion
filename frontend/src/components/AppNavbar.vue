@@ -73,7 +73,7 @@ async function logout() {
   max-width: 1400px;
   margin: 0 auto;
   padding: 0 1.5rem;
-  height: 56px;
+  height: 64px;
   display: flex;
   align-items: center;
   gap: 2rem;
@@ -89,7 +89,7 @@ async function logout() {
 
 .brand-name {
   font-family: var(--font-mono);
-  font-size: 1.125rem;
+  font-size: 1.25rem;
   font-weight: 700;
   color: var(--accent);
   letter-spacing: -0.03em;
@@ -97,7 +97,7 @@ async function logout() {
 
 .brand-sub {
   font-family: var(--font-mono);
-  font-size: 0.5625rem;
+  font-size: 0.625rem;
   font-weight: 500;
   color: var(--text-tertiary);
   text-transform: uppercase;

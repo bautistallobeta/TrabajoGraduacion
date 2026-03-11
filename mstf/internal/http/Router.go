@@ -1,8 +1,6 @@
 package http
 
 import (
-	"strings"
-
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 
@@ -25,7 +23,7 @@ func InitRouter(productor *kafkamstf.ProductorKafka) *echo.Echo {
 			path := c.Request().URL.Path
 			// confirmar-cuenta SÍ usa token de sesión Estado=P; el SP valida internamente.
 			return path == "/ping" || path == "/usuarios/login" ||
-				strings.HasPrefix(path, "/usuarios/confirmar-cuenta/")
+				path == "/usuarios/confirmar-cuenta"
 		}),
 	)
 
@@ -72,7 +70,7 @@ func initRoutes(router *echo.Echo, productor *kafkamstf.ProductorKafka) {
 	router.POST("/usuarios/logout", usuariosControlador.Logout)
 	router.PUT("/usuarios/activar/:idusuario", usuariosControlador.Activar)
 	router.PUT("/usuarios/desactivar/:idusuario", usuariosControlador.Desactivar)
-	router.PUT("/usuarios/confirmar-cuenta/:idusuario", usuariosControlador.ConfirmarUsuario)
+	router.PUT("/usuarios/confirmar-cuenta", usuariosControlador.ConfirmarUsuario)
 	router.PUT("/usuarios/password/modificar", usuariosControlador.ModificarPassword)
 	router.PUT("/usuarios/password/reestablecer", usuariosControlador.ReestablecerPassword)
 	router.DELETE("/usuarios/:idusuario", usuariosControlador.Borrar)

@@ -7,7 +7,6 @@ const cliente = axios.create({
   headers: { 'Content-Type': 'application/json' }
 })
 
-// Agrega el token Bearer en cada request autenticado
 cliente.interceptors.request.use((config) => {
   const { token } = useAuth()
   if (token.value) {
@@ -16,11 +15,11 @@ cliente.interceptors.request.use((config) => {
   return config
 })
 
-// Si el servidor responde 401, cierra la sesión y redirige al login
+// si 401 cierra sesión y redirige, salvo que la request tenga _noRedirect: true
 cliente.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response?.status === 401) {
+    if (error.response?.status === 401 && !error.config._noRedirect) {
       const { cerrarSesion } = useAuth()
       cerrarSesion()
       window.location.href = '/login'

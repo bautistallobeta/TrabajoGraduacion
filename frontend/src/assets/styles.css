@@ -56,11 +56,11 @@
 
 *, *::before, *::after { box-sizing: border-box; }
 
-html { font-size: 16px; }
+html { font-size: 17.6px; }
 
 body {
   font-family: var(--font-sans);
-  font-size: 0.875rem;
+  font-size: 0.9375rem;
   color: var(--text-primary);
   background-color: var(--bg);
   margin: 0;

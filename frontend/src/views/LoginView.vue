@@ -1,15 +1,23 @@
 <script setup>
-import { ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, onMounted } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
 import { useAuth } from '../stores/auth'
 import cliente from '../api/cliente'
 
 const router = useRouter()
+const route  = useRoute()
 const { iniciarSesion } = useAuth()
 
-const form = ref({ usuario: '', password: '' })
+const form    = ref({ usuario: '', password: '' })
 const cargando = ref(false)
-const error = ref(null)
+const error   = ref(null)
+const exito   = ref(null)
+
+onMounted(() => {
+  if (route.query.confirmado === '1') {
+    exito.value = 'Cuenta activada correctamente. Ya podés iniciar sesión con tu nueva contraseña.'
+  }
+})
 
 async function login() {
   if (!form.value.usuario || !form.value.password) return
@@ -21,7 +29,20 @@ async function login() {
       Password: form.value.password
     })
     iniciarSesion(res.data.TokenSesion, form.value.usuario)
-    router.push('/usuarios')
+
+    // Verificar si el token sirve para endpoints admin.
+    // Si devuelve 401, el usuario es Pendiente → redirigir a confirmar cuenta.
+    try {
+      await cliente.get('/parametros', { _noRedirect: true })
+      router.push('/usuarios')
+    } catch (testError) {
+      if (testError.response?.status === 401) {
+        // Mantener el token xq lo necesita el endpoint de confirmar-cuenta
+        router.push('/confirmar-cuenta')
+      } else {
+        router.push('/usuarios')
+      }
+    }
   } catch (e) {
     error.value = e.response?.data?.error ?? 'Credenciales incorrectas'
   } finally {
@@ -40,6 +61,9 @@ async function login() {
       </div>
 
       <form @submit.prevent="login">
+        <div v-if="exito" class="alert alert-success mb-4" role="alert">
+          {{ exito }}
+        </div>
         <div v-if="error" class="alert alert-danger mb-4" role="alert">
           {{ error }}
         </div>

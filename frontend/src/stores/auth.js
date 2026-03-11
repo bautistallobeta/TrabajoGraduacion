@@ -41,8 +41,6 @@ export function useAuth() {
     sessionStorage.removeItem(SESSION_KEY)
   }
 
-  // Verifica expiración y limpia si corresponde
-  // Retorna true si la sesión es válida
   function verificarExpiracion() {
     if (sesion.value && Date.now() > sesion.value.expira) {
       cerrarSesion()

@@ -245,16 +245,12 @@ func (uc *UsuariosControlador) Logout(c echo.Context) error {
 
 func (uc *UsuariosControlador) ConfirmarUsuario(c echo.Context) error {
 	type Request struct {
-		IdUsuario         int    `param:"IdUsuario"`
 		Password          string `json:"Password"`
 		ConfirmarPassword string `json:"ConfirmarPassword"`
 	}
 	req := &Request{}
 	if err := c.Bind(req); err != nil {
 		return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta("Parámetros inválidos: "+utils.SanitizarError(err)))
-	}
-	if req.IdUsuario <= 0 {
-		return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta("IdUsuario es campo obligatorio"))
 	}
 	if req.Password == "" || req.ConfirmarPassword == "" {
 		return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta("Password y ConfirmarPassword son campos obligatorios"))
@@ -272,7 +268,7 @@ func (uc *UsuariosControlador) ConfirmarUsuario(c echo.Context) error {
 		return c.JSON(http.StatusUnauthorized, models.NewErrorRespuesta("Se requiere token de sesión Bearer"))
 	}
 	ctx := context.WithValue(c.Request().Context(), auth.ClaveCredencial, partes[1])
-	usuario := &models.Usuarios{IdUsuario: req.IdUsuario}
+	usuario := &models.Usuarios{}
 	mensaje, err := usuario.ConfirmarCuenta(ctx, utils.MD5Hash(req.Password), utils.MD5Hash(req.ConfirmarPassword))
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, models.NewErrorRespuesta("Error al confirmar cuenta del usuario: "+utils.SanitizarError(err)))
