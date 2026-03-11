@@ -2,3 +2,4 @@
 .env
 /tests_borrador/*
 DUMP_20260224.sql
+node_modules

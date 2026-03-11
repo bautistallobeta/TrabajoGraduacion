@@ -1,7 +1,27 @@
 services:
+
+  mysql:
+    image: mysql:8.0
+    container_name: mstf-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+    ports:
+      - "3307:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./DUMP_20260224.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-p${MYSQL_ROOT_PASSWORD}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks:
+      - mstf-net
+
   kafka:
     image: confluentinc/cp-kafka:7.6.1
-    container_name: kafka-kraft
+    container_name: mstf-kafka
     ports:
       - "9092:9092"
     environment:
@@ -9,12 +29,12 @@ services:
       KAFKA_NODE_ID: 1
       KAFKA_PROCESS_ROLES: 'broker,controller'
       KAFKA_CONTROLLER_LISTENER_NAMES: 'CONTROLLER'
-      KAFKA_LISTENERS: 'PLAINTEXT://:9092,CONTROLLER://:9093'
+      KAFKA_LISTENERS: 'PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093'
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: 'CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT'
       KAFKA_INTER_BROKER_LISTENER_NAME: 'PLAINTEXT'
-      
-      # Config Clave
-      KAFKA_ADVERTISED_LISTENERS: 'PLAINTEXT://localhost:9092'
+
+      # nombre de servicio interno para que LOS otros contenedores puedan conectarse
+      KAFKA_ADVERTISED_LISTENERS: 'PLAINTEXT://kafka:9092'
 
       # Config de Log y Cluster ID
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
@@ -22,7 +42,94 @@ services:
       KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
       KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
       KAFKA_LOG_DIRS: '/tmp/kafka-logs'
-      
+
       CLUSTER_ID: ${KAFKA_CLUSTER_ID}
-      
       KAFKA_CONTROLLER_QUORUM_VOTERS: '1@kafka:9093'
+    healthcheck:
+      test: ["CMD-SHELL", "kafka-broker-api-versions --bootstrap-server localhost:9092 2>/dev/null || exit 1"]
+      interval: 5s
+      timeout: 10s
+      retries: 20
+      start_period: 30s
+    networks:
+      - mstf-net
+
+  kafka-init:
+    image: confluentinc/cp-kafka:7.6.1
+    container_name: mstf-kafka-init
+    depends_on:
+      kafka:
+        condition: service_healthy
+    entrypoint: ["/bin/sh", "-c"]
+    command: >
+      "kafka-topics --bootstrap-server kafka:9092
+      --create --if-not-exists
+      --topic ${KAFKA_TOPIC_TRANSFERS}
+      --partitions 1
+      --replication-factor 1 &&
+      echo 'Topic ${KAFKA_TOPIC_TRANSFERS} listo'"
+    networks:
+      - mstf-net
+
+  tigerbeetle:
+    image: ghcr.io/tigerbeetle/tigerbeetle:0.16.61
+    container_name: mstf-tigerbeetle
+    # Formatea el archivo de datos si no existe
+    entrypoint: ["/bin/sh", "-c"]
+    command: >
+      "[ -f /data/0_0.tigerbeetle ] ||
+      /tigerbeetle format --cluster=0 --replica=0 --replica-count=1 /data/0_0.tigerbeetle &&
+      exec /tigerbeetle start --addresses=0.0.0.0:3000 --cache-grid=256MiB /data/0_0.tigerbeetle"
+    volumes:
+      - tb_data:/data
+    # io_uring es req por TigerBeetle
+    security_opt:
+      - seccomp:unconfined
+    networks:
+      mstf-net:
+        # IP fija xq la librería Go de TigerBeetle solo acepta IPs, no hostnames
+        ipv4_address: 172.28.0.10
+
+  mstf:
+    build:
+      context: ./mstf
+      dockerfile: Dockerfile
+    container_name: mstf-app
+    ports:
+      - "8080:8080"
+    environment:
+      KAFKA_BROKERS: "kafka:9092"
+      KAFKA_TOPIC_TRANSFERS: ${KAFKA_TOPIC_TRANSFERS}
+      KAFKA_GROUP_ID: ${KAFKA_GROUP_ID}
+      TB_ADDRESSES: "172.28.0.10:3000"
+      MYSQL_HOST: "mysql"
+      MYSQL_PORT: "3306"
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      WEBHOOK_URL: ${WEBHOOK_URL}
+    # io_uring es requerido por la librería nativa de TigerBeetle
+    security_opt:
+      - seccomp:unconfined
+    depends_on:
+      mysql:
+        condition: service_healthy
+      kafka-init:
+        condition: service_completed_successfully
+      tigerbeetle:
+        condition: service_started
+    # Reinicia automáticamente si falla al arrancar
+    restart: on-failure
+    networks:
+      - mstf-net
+
+networks:
+  mstf-net:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.28.0.0/16
+
+volumes:
+  mysql_data:
+  tb_data:
