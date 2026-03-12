@@ -6,7 +6,6 @@ import (
 	"MSTransaccionesFinancieras/internal/models"
 	"MSTransaccionesFinancieras/internal/utils"
 	"context"
-	"log"
 	"net/http"
 	"strings"
 
@@ -92,7 +91,7 @@ func (uc *UsuariosControlador) ModificarPassword(c echo.Context) error {
 	if err := c.Bind(req); err != nil {
 		return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta("Parámetros inválidos: "+utils.SanitizarError(err)))
 	}
-	log.Printf("\n\n\n  Request: %+v\n\n\n", req)
+	//log.Printf("\n\n\n  Request: %+v\n\n\n", req)
 	if strings.TrimSpace(req.PasswordAnterior) == "" || strings.TrimSpace(req.PasswordNuevo) == "" || strings.TrimSpace(req.ConfirmarPassword) == "" {
 		return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta("PasswordAnterior, PasswordNuevo y ConfirmarPassword son campos obligatorios"))
 	}

@@ -50,8 +50,7 @@ func NewConsumidor(cfg config.Config, procesador *gestores.GestorTransferencias)
 func (c *Consumidor) Start() {
 	c.wg.Add(1)
 	go c.batchLoop()
-	log.Printf("Consumidor iniciado. Kafka Topic: %s, GroupID: %s. Tamaño de lote y timeout leídos de parámetros DB (KAFKABATCHSIZE, KAFKABATCHTIMEOUTMS).",
-		c.config.TopicKafka, c.config.GroupIDKafka)
+	//log.Printf("Consumidor iniciado. Kafka Topic: %s, GroupID: %s. Tamaño de lote y timeout leídos de parámetros DB (KAFKABATCHSIZE, KAFKABATCHTIMEOUTMS).", c.config.TopicKafka, c.config.GroupIDKafka)
 }
 
 func (c *Consumidor) Close() {
@@ -60,7 +59,7 @@ func (c *Consumidor) Close() {
 	if err := c.reader.Close(); err != nil {
 		log.Printf("Error al cerrar Kafka reader: %v", err)
 	}
-	log.Println("Consumidor detenido.")
+	//log.Println("Consumidor detenido.")
 }
 
 // loop principal que procesa lotes de transferencias
@@ -71,7 +70,7 @@ func (c *Consumidor) batchLoop() {
 	for {
 		select {
 		case <-c.stopChan:
-			log.Println("Deteniendo batchLoop...")
+			//log.Println("Deteniendo batchLoop...")
 			return
 		default:
 			// Armar el lote desde Kafka
@@ -81,7 +80,7 @@ func (c *Consumidor) batchLoop() {
 				continue
 			}
 
-			log.Printf("Lote de Kafka recibido. Procesando %d transferencias (%d fallidas en parseo).", len(transferenciasLote), len(fallidasParseo))
+			//log.Printf("Lote de Kafka recibido. Procesando %d transferencias (%d fallidas en parseo).", len(transferenciasLote), len(fallidasParseo))
 
 			// Procesar con retry en memoria: no avanza al próximo lote hasta que el actual se procese
 			// Si el MS cae durante el retry, Kafka retoma desde el ultimo offset no commiteado
@@ -110,7 +109,7 @@ func (c *Consumidor) procesarConRetry(
 		err := c.procesador.CrearLote(transferenciasLote, kafkaMsgsLote, fallidasParseo)
 		if err == nil {
 			// Commit de offsets en Kafka (solo llega hasta acá si el procesamiento fue exitoso)
-			log.Printf("Lote procesado exitosamente. Haciendo commit de %d offsets en Kafka.", len(mensajesLote))
+			//log.Printf("Lote procesado exitosamente. Haciendo commit de %d offsets en Kafka.", len(mensajesLote))
 			if commitErr := c.reader.CommitMessages(ctx, mensajesLote...); commitErr != nil {
 				log.Printf("CRÍTICO [Consumidor.batchLoop]: No se pudo hacer commit de offsets: %v", commitErr)
 			}

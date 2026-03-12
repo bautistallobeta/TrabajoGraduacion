@@ -24,14 +24,14 @@ func InitProductor(cfg config.Config) (*ProductorKafka, error) {
 		MaxAttempts:  3,
 	}
 
-	log.Println("Productor de Kafka conectado.")
+	//log.Println("Productor de Kafka conectado.")
 	return &ProductorKafka{writer: writer}, nil
 }
 
 func (p *ProductorKafka) Close() {
 	if p.writer != nil {
 		if err := p.writer.Close(); err != nil {
-			log.Printf("Error al cerrar Kafka writer (productor): %v", err)
+			//log.Printf("Error al cerrar Kafka writer (productor): %v", err)
 		}
 	}
 }

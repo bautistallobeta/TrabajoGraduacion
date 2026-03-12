@@ -3,7 +3,6 @@ package models
 import (
 	"errors"
 	"fmt"
-	"log"
 	"strconv"
 	"time"
 
@@ -202,7 +201,7 @@ func (c *Cuentas) Desactivar() error {
 
 	flagCerrada := types.AccountFlags{Closed: true}.ToUint16()
 	if (accounts[0].Flags & flagCerrada) != 0 {
-		log.Printf("GestorCuentas.Desactivar: cuenta %s ya estaba cerrada", idCuentaStr)
+		//log.Printf("GestorCuentas.Desactivar: cuenta %s ya estaba cerrada", idCuentaStr)
 		return nil
 	}
 
@@ -235,7 +234,7 @@ func (c *Cuentas) Desactivar() error {
 		return fmt.Errorf("error al desactivar cuenta: %s", results[0].Result.String())
 	}
 
-	log.Printf("GestorCuentas.Desactivar: cuenta %s desactivada exitosamente", idCuentaStr)
+	//log.Printf("GestorCuentas.Desactivar: cuenta %s desactivada exitosamente", idCuentaStr)
 	return nil
 }
 
@@ -267,7 +266,7 @@ func (c *Cuentas) Activar() error {
 
 	flagCerrada := types.AccountFlags{Closed: true}.ToUint16()
 	if (accounts[0].Flags & flagCerrada) == 0 {
-		log.Printf("GestorCuentas.Activar: cuenta %s ya estaba activa", idCuentaStr)
+		//log.Printf("GestorCuentas.Activar: cuenta %s ya estaba activa", idCuentaStr)
 		return nil
 	}
 
@@ -314,7 +313,7 @@ func (c *Cuentas) Activar() error {
 		return fmt.Errorf("error al activar cuenta: %s", results[0].Result.String())
 	}
 
-	log.Printf("GestorCuentas.Activar: cuenta %s activada exitosamente", idCuentaStr)
+	//log.Printf("GestorCuentas.Activar: cuenta %s activada exitosamente", idCuentaStr)
 	return nil
 }
 

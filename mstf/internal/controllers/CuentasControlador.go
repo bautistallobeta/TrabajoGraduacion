@@ -5,7 +5,6 @@ import (
 	"MSTransaccionesFinancieras/internal/models"
 	"MSTransaccionesFinancieras/internal/utils"
 	"fmt"
-	"log"
 	"math/big"
 	"net/http"
 	"strconv"
@@ -15,7 +14,7 @@ import (
 )
 
 type CuentasControlador struct {
-	Gestor              *gestores.GestorCuentas
+	Gestor               *gestores.GestorCuentas
 	GestorTransferencias *gestores.GestorTransferencias
 }
 
@@ -54,10 +53,10 @@ func (cc *CuentasControlador) DameHistorial(c echo.Context) error {
 	}
 
 	type BalanceHistorial struct {
-		Debitos string `json:"Debitos"`
+		Debitos  string `json:"Debitos"`
 		Creditos string `json:"Creditos"`
-		Balance string `json:"Balance"`
-		Fecha   string `json:"Fecha"`
+		Balance  string `json:"Balance"`
+		Fecha    string `json:"Fecha"`
 	}
 
 	type Response struct {
@@ -239,8 +238,8 @@ func (cc *CuentasControlador) Crear(c echo.Context) error {
 	}
 
 	// cuentas creadas vía APIREST: DebitsMustNotExceedCredits = true (IdUsuarioFinal > 0)
-	idCuentaTBString, existe, err := cc.Gestor.Crear(models.Cuentas{IdMoneda: req.IdMoneda, IdUsuarioFinal: req.IdUsuarioFinal, Fecha: req.Fecha})
-	log.Printf("\n\nCuentasControlador.Crear: Resultado de creación en GestorCuentas: mensaje='%s', existe=%v, error='%v'", idCuentaTBString, existe, err)
+	_, existe, err := cc.Gestor.Crear(models.Cuentas{IdMoneda: req.IdMoneda, IdUsuarioFinal: req.IdUsuarioFinal, Fecha: req.Fecha})
+	//log.Printf("\n\nCuentasControlador.Crear: Resultado de creación en GestorCuentas: mensaje='%s', existe=%v, error='%v'", idCuentaTBString, existe, err)
 	if err != nil {
 		return c.JSON(http.StatusConflict, models.NewErrorRespuesta("Error al crear cuenta: "+utils.SanitizarError(err)))
 	}

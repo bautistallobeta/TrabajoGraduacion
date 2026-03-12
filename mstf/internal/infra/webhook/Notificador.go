@@ -61,10 +61,10 @@ func (n *Notificador) llamarWebhook(payload models.LoteNotificado) error {
 	}
 	urlWebhook := n.cfg.URLWebhook
 	if urlWebhook == "" {
-		log.Printf("ADVERTENCIA Notificador: URLWebhook no configurada. Simulación de envío exitoso:\n%s", string(jsonPayload))
+		//log.Printf("ADVERTENCIA Notificador: URLWebhook no configurada. Simulación de envío exitoso:\n%s", string(jsonPayload))
 		return nil
 	}
-	log.Printf("Notificador: Enviando POST Webhook a %s. Lote de %d transfers.", urlWebhook, payload.CantidadProcesada)
+	//log.Printf("Notificador: Enviando POST Webhook a %s. Lote de %d transfers.", urlWebhook, payload.CantidadProcesada)
 	client := http.Client{
 		Timeout: 15 * time.Second,
 	}
@@ -75,7 +75,7 @@ func (n *Notificador) llamarWebhook(payload models.LoteNotificado) error {
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode >= 200 && resp.StatusCode < 300 {
-		log.Printf("Notificador: Webhook enviado exitosamente. Status: %s", resp.Status)
+		//log.Printf("Notificador: Webhook enviado exitosamente. Status: %s", resp.Status)
 		return nil
 	}
 	log.Printf("ERROR [Notificador.llamarWebhook]: Webhook respondió con un error. Status: %s", resp.Status)

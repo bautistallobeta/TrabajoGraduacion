@@ -75,7 +75,7 @@ func (gt *GestorTransferencias) BuscarAvanzado(
 			Flags:        types.QueryFilterFlags{Reversed: true}.ToUint32(),
 		}
 
-		log.Printf("GestorTransferencias.BuscarAvanzado: Ejecutando QueryTransfers (TimestampMax=%d, Limit=%d)", cursorTimestampMax, restantes)
+		//log.Printf("GestorTransferencias.BuscarAvanzado: Ejecutando QueryTransfers (TimestampMax=%d, Limit=%d)", cursorTimestampMax, restantes)
 		transfers, err := persistence.ClienteTB.QueryTransfers(filter)
 		if err != nil {
 			log.Printf("ERROR [GestorTransferencias.BuscarAvanzado]: QueryTransfers falló: %v", err)
@@ -115,12 +115,12 @@ func (gt *GestorTransferencias) BuscarAvanzado(
 		cursorTimestampMax = ultimoTimestamp - 1
 
 		if len(tbResultados) > 50000 {
-			log.Printf("ADVERTENCIA [GestorTransferencias.BuscarAvanzado]: Límite de seguridad alcanzado (50.000 transferencias)")
+			//log.Printf("ADVERTENCIA [GestorTransferencias.BuscarAvanzado]: Límite de seguridad alcanzado (50.000 transferencias)")
 			break
 		}
 	}
 
-	log.Printf("GestorTransferencias.BuscarAvanzado: Total encontrado: %d transferencias", len(tbResultados))
+	//log.Printf("GestorTransferencias.BuscarAvanzado: Total encontrado: %d transferencias", len(tbResultados))
 	return gt.convertirYFiltrar(tbResultados, IncluyeRevertidas)
 }
 
@@ -220,7 +220,7 @@ func (gt *GestorTransferencias) CrearLote(Batch []types.Transfer, KafkaMsgs []mo
 
 	for i, t := range Batch {
 		if erroresCuentas[i] != "" {
-			log.Printf("[VALIDACIÓN] Transfer ID %s rechazada: %s", utils.Uint128AStringDecimal(t.ID), erroresCuentas[i])
+			//log.Printf("[VALIDACIÓN] Transfer ID %s rechazada: %s", utils.Uint128AStringDecimal(t.ID), erroresCuentas[i])
 			fallidas = append(fallidas, models.NewTransferenciaNotificadaError(t, KafkaMsgs[i], erroresCuentas[i]))
 			continue
 		}
@@ -238,7 +238,7 @@ func (gt *GestorTransferencias) CrearLote(Batch []types.Transfer, KafkaMsgs []mo
 			estadoError = gt.validarTransferencia(t)
 		}
 		if estadoError != "" {
-			log.Printf("[VALIDACIÓN] Transfer ID %s rechazada: %s", utils.Uint128AStringDecimal(t.ID), estadoError)
+			//log.Printf("[VALIDACIÓN] Transfer ID %s rechazada: %s", utils.Uint128AStringDecimal(t.ID), estadoError)
 			fallidas = append(fallidas, models.NewTransferenciaNotificadaError(t, KafkaMsgs[i], estadoError))
 		} else {
 			paraEnviar = append(paraEnviar, t)
@@ -247,7 +247,7 @@ func (gt *GestorTransferencias) CrearLote(Batch []types.Transfer, KafkaMsgs []mo
 	}
 
 	if len(fallidas) > 0 {
-		log.Printf("VALIDACIÓN: %d de %d transfers rechazadas antes de TigerBeetle.", len(fallidas), len(Batch)+len(FallidasParseo))
+		//log.Printf("VALIDACIÓN: %d de %d transfers rechazadas antes de TigerBeetle.", len(fallidas), len(Batch)+len(FallidasParseo))
 	}
 
 	var results []types.TransferEventResult
@@ -263,7 +263,7 @@ func (gt *GestorTransferencias) CrearLote(Batch []types.Transfer, KafkaMsgs []mo
 		}
 
 		if len(results) > 0 {
-			log.Printf("RESPUESTA TB: Fallo en %d de %d transfers. Detalle de resultados:", len(results), len(paraEnviar))
+			//log.Printf("RESPUESTA TB: Fallo en %d de %d transfers. Detalle de resultados:", len(results), len(paraEnviar))
 			for _, result := range results {
 				if int(result.Index) < len(paraEnviar) {
 					idTransferencia := utils.Uint128AStringDecimal(paraEnviar[result.Index].ID)
@@ -273,7 +273,7 @@ func (gt *GestorTransferencias) CrearLote(Batch []types.Transfer, KafkaMsgs []mo
 				}
 			}
 		} else {
-			log.Printf("RESPUESTA TB: Batch de %d transfers procesado exitosamente.", len(paraEnviar))
+			//log.Printf("RESPUESTA TB: Batch de %d transfers procesado exitosamente.", len(paraEnviar))
 		}
 	}
 

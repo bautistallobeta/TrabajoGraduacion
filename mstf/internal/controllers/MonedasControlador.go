@@ -76,7 +76,7 @@ func (mc *MonedasControlador) Crear(c echo.Context) error {
 	// crea la moneda (estado P), crea la cuenta empresa en TB y activa la moneda (estado A)
 	ctx := c.Request().Context()
 	mensaje, err := mc.Gestor.Crear(ctx, models.Monedas{IdMoneda: req.IdMoneda, IdCuentaEmpresa: utils.ConcatenarIDString(uint64(req.IdMoneda), uint64(0))})
-	log.Printf("\n\nMonedasControlador.Crear: Resultado de creación en GestorMonedas: mensaje='%s', error='%v'", mensaje, err)
+	//log.Printf("\n\nMonedasControlador.Crear: Resultado de creación en GestorMonedas: mensaje='%s', error='%v'", mensaje, err)
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, models.NewErrorRespuesta("Error al crear moneda: "+utils.SanitizarError(err)))
 	}

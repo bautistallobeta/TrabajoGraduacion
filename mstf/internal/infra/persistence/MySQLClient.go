@@ -35,13 +35,13 @@ func InitMySQLClient(cfg config.Config) error {
 		return err
 	}
 
-	log.Printf("Conexión a MySQL establecida (%s:%d/%s)", cfg.MySQLHost, cfg.MySQLPort, cfg.MySQLDatabase)
+	//log.Printf("Conexión a MySQL establecida (%s:%d/%s)", cfg.MySQLHost, cfg.MySQLPort, cfg.MySQLDatabase)
 	return nil
 }
 
 func CloseMySQLClient() {
 	if ClienteMySQL != nil {
 		ClienteMySQL.Close()
-		log.Println("Conexión a MySQL cerrada")
+		//log.Println("Conexión a MySQL cerrada")
 	}
 }
