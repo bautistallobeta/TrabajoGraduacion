@@ -188,6 +188,10 @@ func (c *Cuentas) Desactivar() error {
 		return errors.New("Error al construir IdCuenta")
 	}
 
+	if idCuenta == idCuentaEmpresa {
+		return errors.New("No se puede desactivar la cuenta empresa")
+	}
+
 	accounts, err := persistence.ClienteTB.LookupAccounts([]types.Uint128{idCuenta})
 	if err != nil {
 		return errors.New("error de comunicación con TigerBeetle")

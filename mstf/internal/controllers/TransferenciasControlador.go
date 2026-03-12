@@ -119,9 +119,13 @@ func (tc *TransferenciasControlador) Buscar(c echo.Context) error {
 		idMoneda = uint32(parsed)
 	}
 
-	estado := c.QueryParam("Estado")
-	if estado != "" && estado != "F" && estado != "R" {
-		return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta("Estado debe ser 'F' (finalizada), 'R' (revertida), o vacío"))
+	incluyeRevertidas := false
+	if s := c.QueryParam("IncluyeRevertidas"); s != "" {
+		parsed, err := strconv.ParseBool(s)
+		if err != nil {
+			return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta("IncluyeRevertidas debe ser true o false"))
+		}
+		incluyeRevertidas = parsed
 	}
 
 	var montoMin uint64 = 0
@@ -179,16 +183,9 @@ func (tc *TransferenciasControlador) Buscar(c echo.Context) error {
 		limite = uint32(parsed)
 	}
 
-	transfers, err := tc.Gestor.BuscarAvanzado(idsTransferencia, idUsuarioFinal, idCategoria, idMoneda, estado, montoMin, montoMax, timestampMin, timestampMax, limite)
+	respuesta, err := tc.Gestor.BuscarAvanzado(idsTransferencia, idUsuarioFinal, idCategoria, idMoneda, incluyeRevertidas, montoMin, montoMax, timestampMin, timestampMax, limite)
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, models.NewErrorRespuesta("Error al buscar transferencias: "+utils.SanitizarError(err)))
-	}
-
-	respuesta := make([]models.Transferencias, 0, len(transfers))
-	for _, t := range transfers {
-		var tr models.Transferencias
-		tr.PoblarDesdeTB(t)
-		respuesta = append(respuesta, tr)
 	}
 
 	return c.JSON(http.StatusOK, map[string]interface{}{

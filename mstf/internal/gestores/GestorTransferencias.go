@@ -20,10 +20,12 @@ func NewGestorTransferencias() *GestorTransferencias {
 	return &GestorTransferencias{}
 }
 
-// Bbusca transferencias según los filtros especificados.
+// Busca transferencias según los filtros especificados.
 // Si IdsTransferencia tiene elementos, hace LookupTransfers directo e ignora el resto de filtros.
 // Parámetros numéricos con valor 0 deshabilitan ese filtro en TigerBeetle.
-// Estado: "F" para finalizadas, "R" para revertidas, "" para todas.
+// IncluyeRevertidas: si true devuelve finalizadas y revertidas; si false solo finalizadas.
+// Las transfers de reversión (internas) nunca se incluyen en los resultados.
+// Estado en respuesta: "F" finalizada, "R" fue revertida.
 // MontoMin/MontoMax: filtrado client-side, 0 = sin límite.
 // FechaInicio/FechaFin: nanosegundos epoch (Timestamp de TB, no UserData32).
 // Los resultados se ordenan de más reciente a más antigua.
@@ -32,36 +34,31 @@ func (gt *GestorTransferencias) BuscarAvanzado(
 	IdUsuarioFinal uint64,
 	IdCategoria uint64,
 	IdMoneda uint32,
-	Estado string,
+	IncluyeRevertidas bool,
 	MontoMin uint64,
 	MontoMax uint64,
 	FechaInicio uint64,
 	FechaFin uint64,
 	Limit uint32,
-) ([]types.Transfer, error) {
+) ([]models.Transferencias, error) {
 	if persistence.ClienteTB == nil {
 		return nil, errors.New("Conexión a TigerBeetle no inicializada")
 	}
 
 	// lookup directo por IDs (ignora el resto de parámetros)
 	if len(IdsTransferencia) > 0 {
-		return persistence.ClienteTB.LookupTransfers(IdsTransferencia)
+		tbTransfers, err := persistence.ClienteTB.LookupTransfers(IdsTransferencia)
+		if err != nil {
+			return nil, err
+		}
+		return gt.convertirYFiltrar(tbTransfers, IncluyeRevertidas)
 	}
 
-	// Mapear estado a Code de TB
-	var codigo uint16 = 0
-	switch Estado {
-	case "F":
-		codigo = models.CodigoTransferenciaNormal
-	case "R":
-		codigo = models.CodigoTransferenciaReversion
-	}
-
-	resultados := make([]types.Transfer, 0)
+	tbResultados := make([]types.Transfer, 0)
 	cursorTimestampMax := FechaFin // avanza hacia atrás en cada página (reversed=true)
 
 	for {
-		restantes := Limit - uint32(len(resultados))
+		restantes := Limit - uint32(len(tbResultados))
 		if restantes == 0 {
 			break
 		}
@@ -70,7 +67,7 @@ func (gt *GestorTransferencias) BuscarAvanzado(
 			UserData128:  types.ToUint128(IdUsuarioFinal),
 			UserData64:   IdCategoria,
 			UserData32:   0,
-			Code:         codigo,
+			Code:         models.CodigoTransferenciaNormal,
 			Ledger:       IdMoneda,
 			TimestampMin: FechaInicio,
 			TimestampMax: cursorTimestampMax,
@@ -96,8 +93,8 @@ func (gt *GestorTransferencias) BuscarAvanzado(
 			if !pasaFiltroMonto(t, MontoMin, MontoMax) {
 				continue
 			}
-			resultados = append(resultados, t)
-			if uint32(len(resultados)) >= Limit {
+			tbResultados = append(tbResultados, t)
+			if uint32(len(tbResultados)) >= Limit {
 				break
 			}
 		}
@@ -106,7 +103,7 @@ func (gt *GestorTransferencias) BuscarAvanzado(
 			break
 		}
 
-		if uint32(len(resultados)) >= Limit {
+		if uint32(len(tbResultados)) >= Limit {
 			break
 		}
 
@@ -117,13 +114,62 @@ func (gt *GestorTransferencias) BuscarAvanzado(
 		}
 		cursorTimestampMax = ultimoTimestamp - 1
 
-		if len(resultados) > 50000 {
+		if len(tbResultados) > 50000 {
 			log.Printf("ADVERTENCIA [GestorTransferencias.BuscarAvanzado]: Límite de seguridad alcanzado (50.000 transferencias)")
 			break
 		}
 	}
 
-	log.Printf("GestorTransferencias.BuscarAvanzado: Total encontrado: %d transferencias", len(resultados))
+	log.Printf("GestorTransferencias.BuscarAvanzado: Total encontrado: %d transferencias", len(tbResultados))
+	return gt.convertirYFiltrar(tbResultados, IncluyeRevertidas)
+}
+
+// Convierte un slice de transfers de TigerBeetle a models.Transferencias, marca como "R" las
+// revertidas, y si IncluyeRevertidas es false las excluye del resultado final.
+func (gt *GestorTransferencias) convertirYFiltrar(tbTransfers []types.Transfer, IncluyeRevertidas bool) ([]models.Transferencias, error) {
+	resultados := make([]models.Transferencias, 0, len(tbTransfers))
+	idsALookup := make([]types.Uint128, 0)
+	mapaIndice := make(map[types.Uint128]int) // idReversion → índice en resultados
+
+	for _, t := range tbTransfers {
+		var tr models.Transferencias
+		tr.PoblarDesdeTB(t)
+		idx := len(resultados)
+		resultados = append(resultados, tr)
+
+		if t.Code != models.CodigoTransferenciaReversion {
+			idReversion := t.ID
+			idReversion[8] |= 0x01
+			idsALookup = append(idsALookup, idReversion)
+			mapaIndice[idReversion] = idx
+		}
+	}
+
+	if len(idsALookup) > 0 {
+		reversiones, err := persistence.ClienteTB.LookupTransfers(idsALookup)
+		if err != nil {
+			log.Printf("ADVERTENCIA [GestorTransferencias.convertirYFiltrar]: Error al verificar reversiones: %v", err)
+		} else {
+			for _, r := range reversiones {
+				if r.Code == models.CodigoTransferenciaReversion {
+					if idx, ok := mapaIndice[r.ID]; ok {
+						resultados[idx].Estado = "R"
+					}
+				}
+			}
+		}
+	}
+
+	if !IncluyeRevertidas {
+		filtradas := make([]models.Transferencias, 0, len(resultados))
+		for _, tr := range resultados {
+			if tr.Estado != "R" {
+				filtradas = append(filtradas, tr)
+			}
+		}
+		return filtradas, nil
+	}
+
 	return resultados, nil
 }
 

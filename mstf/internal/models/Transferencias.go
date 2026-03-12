@@ -78,6 +78,12 @@ func (t *Transferencias) Dame() error {
 		t.IdTransferenciaOriginal = utils.Uint128AStringDecimal(transferenciaTB.UserData128)
 	} else {
 		t.Estado = "F"
+		idReversion := transferenciaTB.ID
+		idReversion[8] |= 0x01
+		reversiones, errLookup := persistence.ClienteTB.LookupTransfers([]types.Uint128{idReversion})
+		if errLookup == nil && len(reversiones) > 0 && reversiones[0].Code == CodigoTransferenciaReversion {
+			t.Estado = "R"
+		}
 	}
 
 	// Deriva Tipo e IdUsuarioFinal comparando DebitAccountID/CreditAccountID con la cuenta empresa
