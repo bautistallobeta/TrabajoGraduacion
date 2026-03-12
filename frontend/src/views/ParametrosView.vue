@@ -209,7 +209,7 @@ async function guardar() {
 
 <style scoped>
 .btn-icon {
-  padding: 0.375rem 0.5rem;
+  padding: 0.5rem 0.625rem;
   line-height: 1;
   display: inline-flex;
   align-items: center;
