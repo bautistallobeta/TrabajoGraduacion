@@ -15,11 +15,12 @@ import (
 )
 
 type CuentasControlador struct {
-	Gestor *gestores.GestorCuentas
+	Gestor              *gestores.GestorCuentas
+	GestorTransferencias *gestores.GestorTransferencias
 }
 
-func NewCuentasControlador(gc *gestores.GestorCuentas) *CuentasControlador {
-	return &CuentasControlador{Gestor: gc}
+func NewCuentasControlador(gc *gestores.GestorCuentas, gt *gestores.GestorTransferencias) *CuentasControlador {
+	return &CuentasControlador{Gestor: gc, GestorTransferencias: gt}
 }
 
 func (cc *CuentasControlador) Dame(c echo.Context) error {
@@ -53,10 +54,10 @@ func (cc *CuentasControlador) DameHistorial(c echo.Context) error {
 	}
 
 	type BalanceHistorial struct {
-		Debitos   string `json:"Debitos"`
-		Creditos  string `json:"Creditos"`
-		Balance   string `json:"Balance"`
-		Timestamp uint64 `json:"Timestamp"`
+		Debitos string `json:"Debitos"`
+		Creditos string `json:"Creditos"`
+		Balance string `json:"Balance"`
+		Fecha   string `json:"Fecha"`
 	}
 
 	type Response struct {
@@ -131,10 +132,10 @@ func (cc *CuentasControlador) DameHistorial(c echo.Context) error {
 		entero.DivMod(balanceRaw, cien, resto)
 
 		historial = append(historial, BalanceHistorial{
-			Debitos:   utils.Uint128ADecimalMoneda(balance.DebitsPosted),
-			Creditos:  utils.Uint128ADecimalMoneda(balance.CreditsPosted),
-			Balance:   fmt.Sprintf("%s%s.%02d", signo, entero.String(), resto.Int64()),
-			Timestamp: balance.Timestamp,
+			Debitos:  utils.Uint128ADecimalMoneda(balance.DebitsPosted),
+			Creditos: utils.Uint128ADecimalMoneda(balance.CreditsPosted),
+			Balance:  fmt.Sprintf("%s%s.%02d", signo, entero.String(), resto.Int64()),
+			Fecha:    utils.TimestampAFecha(balance.Timestamp),
 		})
 	}
 
@@ -195,25 +196,25 @@ func (cc *CuentasControlador) DameTransferencias(c echo.Context) error {
 		limite = uint32(parsed)
 	}
 
-	cuenta := &models.Cuentas{IdUsuarioFinal: req.IdUsuarioFinal, IdMoneda: req.IdMoneda}
-	transferencias, err := cuenta.ListarTransferenciasCuenta(timestampMin, timestampMax, limite)
+	incluyeRevertidas := false
+	if s := c.QueryParam("IncluyeRevertidas"); s != "" {
+		parsed, err := strconv.ParseBool(s)
+		if err != nil {
+			return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta("IncluyeRevertidas debe ser true o false"))
+		}
+		incluyeRevertidas = parsed
+	}
+
+	transferencias, err := cc.GestorTransferencias.BuscarPorCuenta(
+		req.IdUsuarioFinal, req.IdMoneda, incluyeRevertidas, timestampMin, timestampMax, limite,
+	)
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, models.NewErrorRespuesta("Error al obtener transferencias: "+utils.SanitizarError(err)))
 	}
 
-	respuesta := make([]models.Transferencias, 0, len(transferencias))
-	for _, tb := range transferencias {
-		if tb.Code == models.CodigoTransferenciaCierre {
-			continue
-		}
-		t := &models.Transferencias{}
-		t.PoblarDesdeTB(tb)
-		respuesta = append(respuesta, *t)
-	}
-
 	return c.JSON(http.StatusOK, map[string]interface{}{
-		"Total":          len(respuesta),
-		"Transferencias": respuesta,
+		"Total":          len(transferencias),
+		"Transferencias": transferencias,
 	})
 }
 

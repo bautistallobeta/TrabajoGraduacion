@@ -173,6 +173,34 @@ func (gt *GestorTransferencias) convertirYFiltrar(tbTransfers []types.Transfer, 
 	return resultados, nil
 }
 
+// Retorna las transferencias de una cuenta específica, aplicando la misma lógica de
+// filtrado que BuscarAvanzado: las transfers de reversión (Code=2) nunca aparecen,
+// las revertidas se marcan Estado="R", y si IncluyeRevertidas=false se excluyen.
+func (gt *GestorTransferencias) BuscarPorCuenta(
+	IdUsuarioFinal uint64,
+	IdMoneda uint32,
+	IncluyeRevertidas bool,
+	TimestampMin uint64,
+	TimestampMax uint64,
+	Limite uint32,
+) ([]models.Transferencias, error) {
+	cuenta := &models.Cuentas{IdUsuarioFinal: IdUsuarioFinal, IdMoneda: IdMoneda}
+	tbTransfers, err := cuenta.ListarTransferenciasCuenta(TimestampMin, TimestampMax, Limite)
+	if err != nil {
+		return nil, err
+	}
+
+	// filtrar transfers internas (cierre y reversión) antes de convertir
+	soloNormales := make([]types.Transfer, 0, len(tbTransfers))
+	for _, t := range tbTransfers {
+		if t.Code == models.CodigoTransferenciaNormal {
+			soloNormales = append(soloNormales, t)
+		}
+	}
+
+	return gt.convertirYFiltrar(soloNormales, IncluyeRevertidas)
+}
+
 // Procesa un lote de transferencias recibido del consumidor Kafka.
 // Valida reglas de negocio antes de enviar a TigerBeetle.
 // Las transferencias que fallan validación no van a TB pero sí se notifican con su error.

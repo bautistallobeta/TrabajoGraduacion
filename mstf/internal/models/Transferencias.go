@@ -74,7 +74,7 @@ func (t *Transferencias) Dame() error {
 	code := transferenciaTB.Code
 
 	if code == CodigoTransferenciaReversion {
-		t.Estado = "R"
+		t.Estado = ""
 		t.IdTransferenciaOriginal = utils.Uint128AStringDecimal(transferenciaTB.UserData128)
 	} else {
 		t.Estado = "F"
@@ -133,7 +133,7 @@ func (t *Transferencias) PoblarDesdeTB(Tb types.Transfer) {
 	t.Categoria = Tb.UserData64
 
 	if Tb.Code == CodigoTransferenciaReversion {
-		t.Estado = "R"
+		t.Estado = ""
 		t.Tipo = "R"
 		t.IdTransferenciaOriginal = utils.Uint128AStringDecimal(Tb.UserData128)
 	} else {

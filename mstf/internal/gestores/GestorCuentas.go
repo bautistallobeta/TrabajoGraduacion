@@ -52,21 +52,11 @@ func (gc *GestorCuentas) BuscarAvanzado(
 	// Timestamp para paginación
 	var timestampMin uint64 = 0
 
-	batchSize := Limit
-
-	// Iterar hasta alcanzar el límite total solicitado
 	for {
-		// Calcular cuántos resultados faltan para alcanzar el límite
 		restantes := Limit - uint32(len(resultados))
 		if restantes == 0 {
-			log.Printf("GestorCuentas.BuscarAvanzado: Límite alcanzado (%d cuentas)", Limit)
+			// log.Printf("GestorCuentas.BuscarAvanzado: Límite alcanzado (%d cuentas)", Limit)
 			break
-		}
-
-		// Ajustar batch size para no buscar más resultados de lo necesario
-		currentBatchSize := batchSize
-		if restantes < currentBatchSize {
-			currentBatchSize = restantes
 		}
 
 		filter := types.QueryFilter{
@@ -77,20 +67,20 @@ func (gc *GestorCuentas) BuscarAvanzado(
 			Ledger:       IdMoneda,
 			TimestampMin: timestampMin,
 			TimestampMax: 0,
-			Limit:        currentBatchSize,
+			Limit:        restantes,
 			Flags: types.QueryFilterFlags{
 				Reversed: false,
 			}.ToUint32(),
 		}
 
-		log.Printf("GestorCuentas.BuscarAvanzado: Ejecutando QueryAccounts (TimestampMin=%d, Limit=%d)", timestampMin, currentBatchSize)
+		// log.Printf("GestorCuentas.BuscarAvanzado: Ejecutando QueryAccounts (TimestampMin=%d, Limit=%d)", timestampMin, restantes)
 		accounts, err := persistence.ClienteTB.QueryAccounts(filter)
 		if err != nil {
 			log.Printf("ERROR [GestorCuentas.BuscarAvanzado]: Fallo QueryAccounts: %v", err)
 			return nil, err
 		}
 
-		log.Printf("GestorCuentas.BuscarAvanzado: Obtenidos %d resultados en esta iteración", len(accounts))
+		// log.Printf("GestorCuentas.BuscarAvanzado: Obtenidos %d resultados en esta iteración", len(accounts))
 
 		if len(accounts) == 0 {
 			break
@@ -98,27 +88,26 @@ func (gc *GestorCuentas) BuscarAvanzado(
 
 		resultados = append(resultados, accounts...)
 
-		if uint32(len(accounts)) < currentBatchSize {
-			log.Printf("GestorCuentas.BuscarAvanzado: Obtenidos %d < %d, no hay más resultados", len(accounts), currentBatchSize)
+		if uint32(len(accounts)) < restantes {
+			// log.Printf("GestorCuentas.BuscarAvanzado: Obtenidos %d < %d, no hay más resultados", len(accounts), restantes)
 			break
 		}
 		ultimoTimestamp := accounts[len(accounts)-1].Timestamp
 		timestampMin = ultimoTimestamp + 1
 
-		log.Printf("GestorCuentas.BuscarAvanzado: Obtenidos %d == %d, continuando iteración", len(accounts), currentBatchSize)
+		// log.Printf("GestorCuentas.BuscarAvanzado: Obtenidos %d == %d, continuando iteración", len(accounts), restantes)
 
-		// (TO DO: mejorar paginación - traer siempre el max que se musetran en la pagina y avanzar con el timestamp del mas viejo en cada llamado)
 		if len(resultados) > 50000 {
-			log.Printf("ADVERTENCIA: Se alcanzó el límite de seguridad de 50,000 cuentas")
+			// log.Printf("ADVERTENCIA: Se alcanzó el límite de seguridad de 50,000 cuentas")
 			break
 		}
 	}
 
-	log.Printf("GestorCuentas.BuscarAvanzado: Total acumulado antes de filtrar por estado: %d cuentas", len(resultados))
+	// log.Printf("GestorCuentas.BuscarAvanzado: Total acumulado antes de filtrar por estado: %d cuentas", len(resultados))
 
 	if Estado != "" {
 		resultados = filtrarPorEstado(resultados, Estado)
-		log.Printf("GestorCuentas.BuscarAvanzado: Después de filtrar por estado '%s': %d cuentas", Estado, len(resultados))
+		// log.Printf("GestorCuentas.BuscarAvanzado: Después de filtrar por estado '%s': %d cuentas", Estado, len(resultados))
 	}
 
 	return resultados, nil

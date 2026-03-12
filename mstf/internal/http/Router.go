@@ -37,7 +37,7 @@ func initRoutes(router *echo.Echo, productor *kafkamstf.ProductorKafka) {
 	mainControlador := controllers.NewMainControlador()
 	gestorCuentas := gestores.NewGestorCuentas()
 	gestorTransferencias := gestores.NewGestorTransferencias()
-	cuentasControlador := controllers.NewCuentasControlador(gestorCuentas)
+	cuentasControlador := controllers.NewCuentasControlador(gestorCuentas, gestorTransferencias)
 	transferenciasControlador := controllers.NewTransferenciasControlador(gestorTransferencias, productor)
 	gestorUsuarios := gestores.NewGestorUsuarios()
 	usuariosControlador := controllers.NewUsuariosControlador(gestorUsuarios)
