@@ -218,7 +218,7 @@ body {
 
 /*  Overrides Bootstrap — Tablas  */
 .table {
-  font-size: 0.8125rem;
+  font-size: 0.875rem;
   color: var(--text-primary);
   margin-bottom: 0;
 }
@@ -250,16 +250,16 @@ body {
 /* Helpers de celda */
 .cell-mono {
   font-family: var(--font-mono);
-  font-size: 0.8125rem;
+  font-size: 0.875rem;
 }
 .cell-monto {
   font-family: var(--font-mono);
-  font-size: 0.8125rem;
+  font-size: 0.875rem;
   text-align: right;
 }
 .cell-id {
   font-family: var(--font-mono);
-  font-size: 0.75rem;
+  font-size: 0.8125rem;
   color: var(--text-secondary);
 }
 
