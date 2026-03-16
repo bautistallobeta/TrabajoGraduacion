@@ -44,7 +44,6 @@ let bsCrearModal = null
 
 onMounted(() => {
   bsCrearModal = new Modal(crearModalEl.value)
-  // limpia al cerrar
   crearModalEl.value.addEventListener('hidden.bs.modal', () => {
     nuevoUsuario.value = ''
     creandoUsuario.value = false
@@ -170,7 +169,6 @@ async function restablecerPassword(u) {
   }
 }
 
-// Helpers
 function formatFecha(f) {
   return f ? f.slice(0, 10) : '—'
 }
@@ -182,7 +180,6 @@ const ESTADO_CLASS = { A: 'badge-activo', I: 'badge-inactivo', P: 'badge-pendien
 <template>
   <div>
 
-    <!-- Encabezado -->
     <div class="section-header mb-4">
       <h1 class="page-title">Usuarios</h1>
     </div>
@@ -194,7 +191,6 @@ const ESTADO_CLASS = { A: 'badge-activo', I: 'badge-inactivo', P: 'badge-pendien
 
     <div>
 
-      <!-- Alerta de contraseña restablecida -->
       <div v-if="alertaPwd" class="alert alert-warning alert-dismissible mb-3" role="alert">
         <div class="mb-2">
           Contraseña restablecida para <strong>{{ alertaPwd.usuario }}</strong>.
@@ -207,19 +203,17 @@ const ESTADO_CLASS = { A: 'badge-activo', I: 'badge-inactivo', P: 'badge-pendien
         <button type="button" class="btn-close" @click="alertaPwd = null"></button>
       </div>
 
-      <!-- Búsqueda + Crear en la misma fila -->
       <div class="card mb-3">
         <div class="card-body py-3">
-          <div class="d-flex align-items-end justify-content-between gap-3">
-            <!-- Izquierda: buscador -->
-            <form @submit.prevent="buscar" class="d-flex align-items-end gap-3">
+          <div class="d-flex align-items-end justify-content-between gap-3 flex-wrap">
+            <form @submit.prevent="buscar" class="d-flex align-items-end gap-3 flex-wrap">
               <div>
                 <label class="form-label">Buscar</label>
                 <input
                   v-model="filtros.cadena"
                   type="text"
                   class="form-control"
-                  style="width: 220px"
+                  style="width: 220px; max-width: 100%"
                   placeholder="Nombre de usuario..."
                 />
               </div>
@@ -240,7 +234,6 @@ const ESTADO_CLASS = { A: 'badge-activo', I: 'badge-inactivo', P: 'badge-pendien
                 </button>
               </div>
             </form>
-            <!-- Derecha: crear -->
             <div style="padding-bottom: 2px">
               <button type="button" class="btn btn-primary btn-sm" @click="abrirModalCrear">
                 + Crear usuario
@@ -250,7 +243,6 @@ const ESTADO_CLASS = { A: 'badge-activo', I: 'badge-inactivo', P: 'badge-pendien
         </div>
       </div>
 
-      <!-- Tabla de resultados -->
       <div class="card">
         <div class="card-body p-0">
 

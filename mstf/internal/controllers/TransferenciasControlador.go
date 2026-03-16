@@ -168,14 +168,20 @@ func (tc *TransferenciasControlador) Buscar(c echo.Context) error {
 		timestampMax = ts
 	}
 
+	pLimite := &models.Parametros{Parametro: "LIMITEBUSCARTRANSFERENCIAS"}
 	var limite uint32 = 100
+	if _, err := pLimite.Dame(); err == nil {
+		if val, err := strconv.ParseUint(pLimite.Valor, 10, 32); err == nil {
+			limite = uint32(val)
+		}
+	}
 	if s := c.QueryParam("Limite"); s != "" {
 		parsed, err := strconv.ParseUint(s, 10, 32)
 		if err != nil {
 			return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta("Limite debe ser un número válido"))
 		}
-		if parsed > 500 {
-			return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta("Limite no puede ser mayor a 500"))
+		if parsed > uint64(limite) {
+			return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta("Limite no puede ser mayor al configurado"))
 		}
 		if parsed == 0 {
 			return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta("Limite debe ser mayor a 0"))

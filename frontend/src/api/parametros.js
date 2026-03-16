@@ -1,5 +1,11 @@
 import cliente from './cliente'
 
+// GET /parametros/:parametro
+export async function dame(parametro) {
+  const res = await cliente.get(`/parametros/${parametro}`)
+  return res.data
+}
+
 // GET /parametros
 export async function buscar(cadena = '') {
   const params = {}

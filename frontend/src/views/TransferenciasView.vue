@@ -1,17 +1,41 @@
 <script setup>
-import { ref, onMounted, onBeforeUnmount } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { Modal } from 'bootstrap'
 import * as api from '../api/transferencias'
+import { dame as dameParametro } from '../api/parametros'
 
 const transferencias = ref([])
 const cargando       = ref(false)
 const total          = ref(0)
+
+const limite       = ref(100)
+const paginaActual = ref(1)
+const POR_PAGINA   = 50
+
+const totalPaginas = computed(() => Math.max(1, Math.ceil(transferencias.value.length / POR_PAGINA)))
+
+const transferenciasEnPagina = computed(() =>
+  transferencias.value.slice((paginaActual.value - 1) * POR_PAGINA, paginaActual.value * POR_PAGINA)
+)
+
+const paginasBotones = computed(() => {
+  const tot = totalPaginas.value
+  const act = paginaActual.value
+  if (tot <= 7) return Array.from({ length: tot }, (_, i) => i + 1)
+  const pags = [1]
+  if (act > 3) pags.push('...')
+  for (let p = Math.max(2, act - 1); p <= Math.min(tot - 1, act + 1); p++) pags.push(p)
+  if (act < tot - 2) pags.push('...')
+  pags.push(tot)
+  return pags
+})
 
 function hoy() {
   return new Date().toISOString().slice(0, 10)
 }
 
 const filtros = ref({
+  idTransferencia:   '',
   idUsuarioFinal:    '',
   idMoneda:          '',
   idCategoria:       '',
@@ -33,8 +57,10 @@ function mostrarAlerta(tipo, mensaje) {
 
 async function buscar() {
   cargando.value = true
+  paginaActual.value = 1
   try {
     const params = {}
+    if (filtros.value.idTransferencia)   params.IdsTransferencia  = filtros.value.idTransferencia
     if (filtros.value.idUsuarioFinal)    params.IdUsuarioFinal    = filtros.value.idUsuarioFinal
     if (filtros.value.idMoneda)          params.IdMoneda          = filtros.value.idMoneda
     if (filtros.value.idCategoria)       params.IdCategoria       = filtros.value.idCategoria
@@ -54,7 +80,14 @@ async function buscar() {
   }
 }
 
-onMounted(buscar)
+onMounted(async () => {
+  try {
+    const p = await dameParametro('LIMITEBUSCARTRANSFERENCIAS')
+    const val = parseInt(p.Valor)
+    if (!isNaN(val) && val > 0) limite.value = val
+  } catch { /* usa el default */ }
+  buscar()
+})
 
 // Modal p ver detalle
 const detalleModalEl  = ref(null)
@@ -200,6 +233,9 @@ function formatTimestamp(f) {
   return f ? f.slice(0, 19).replace('T', ' ') : '—'
 }
 
+const _fmt = new Intl.NumberFormat('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+function formatMonto(v) { return _fmt.format(parseFloat(v) || 0) }
+
 const TIPO_LABEL = { I: 'Ingreso', E: 'Egreso', R: 'Reversión' }
 const TIPO_CLASS = { I: 'tipo-ingreso', E: 'tipo-egreso', R: 'tipo-reversion' }
 
@@ -227,6 +263,10 @@ const ESTADO_CLASS = { F: 'badge-activo', R: 'badge-pendiente' }
       <div class="card-body py-3">
         <form @submit.prevent="buscar">
           <div class="filtros-grid">
+            <div>
+              <label class="form-label">ID Transferencia</label>
+              <input v-model="filtros.idTransferencia" type="text" class="form-control" placeholder="ID exacto..." />
+            </div>
             <div>
               <label class="form-label">Usuario</label>
               <input v-model="filtros.idUsuarioFinal" type="number" min="1" class="form-control" placeholder="ID..." />
@@ -267,7 +307,7 @@ const ESTADO_CLASS = { F: 'badge-activo', R: 'badge-pendiente' }
               </div>
             </div>
             <div class="d-flex align-items-end">
-              <button type="submit" class="btn btn-outline-primary btn-sm w-100" :disabled="cargando">
+              <button type="submit" class="btn btn-outline-primary w-100" :disabled="cargando">
                 Buscar
               </button>
             </div>
@@ -293,8 +333,11 @@ const ESTADO_CLASS = { F: 'badge-activo', R: 'badge-pendiente' }
         </div>
 
         <div v-else class="table-responsive">
-          <div class="total-row">
-            {{ total }} resultado{{ total !== 1 ? 's' : '' }}
+          <div class="total-row d-flex align-items-center justify-content-between">
+            <span>{{ total }} resultado{{ total !== 1 ? 's' : '' }}</span>
+            <span v-if="total === limite" class="limite-aviso">
+              Se alcanzó el límite de búsqueda. Acotar los filtros para resultados más precisos.
+            </span>
           </div>
           <table class="table mb-0">
             <thead>
@@ -305,13 +348,14 @@ const ESTADO_CLASS = { F: 'badge-activo', R: 'badge-pendiente' }
                 <th>Tipo</th>
                 <th>Categoría</th>
                 <th class="text-end">Monto</th>
+                <th>Fecha Alta</th>
+                <th>Procesada</th>
                 <th>Estado</th>
-                <th>Fecha</th>
                 <th style="width: 1%; white-space: nowrap"></th>
               </tr>
             </thead>
             <tbody>
-              <tr v-for="t in transferencias" :key="t.IdTransferencia" class="clickable" @click="verDetalle(t)">
+              <tr v-for="t in transferenciasEnPagina" :key="t.IdTransferencia" class="clickable" @click="verDetalle(t)">
                 <td class="cell-id" style="max-width: 140px; overflow: hidden; text-overflow: ellipsis">
                   {{ t.IdTransferencia }}
                 </td>
@@ -324,13 +368,14 @@ const ESTADO_CLASS = { F: 'badge-activo', R: 'badge-pendiente' }
                   <span v-else class="text-muted">—</span>
                 </td>
                 <td class="cell-id">{{ t.Categoria }}</td>
-                <td class="cell-monto">{{ t.Monto }}</td>
+                <td class="cell-monto">{{ formatMonto(t.Monto) }}</td>
+                <td>{{ formatFecha(t.Fecha) }}</td>
+                <td class="cell-id">{{ formatTimestamp(t.FechaProceso) }}</td>
                 <td>
                   <span :class="`badge ${ESTADO_CLASS[t.Estado] ?? ''}`">
                     {{ ESTADO_LABEL[t.Estado] ?? t.Estado }}
                   </span>
                 </td>
-                <td>{{ formatFecha(t.Fecha) }}</td>
                 <td>
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--text-tertiary)">
                     <polyline points="9 18 15 12 9 6"/>
@@ -339,6 +384,19 @@ const ESTADO_CLASS = { F: 'badge-activo', R: 'badge-pendiente' }
               </tr>
             </tbody>
           </table>
+          <nav v-if="totalPaginas > 1" class="d-flex justify-content-center py-3">
+            <ul class="pagination pagination-sm mb-0">
+              <li class="page-item" :class="{ disabled: paginaActual === 1 }">
+                <button class="page-link" @click="paginaActual--">&lsaquo;</button>
+              </li>
+              <li v-for="p in paginasBotones" :key="p + '-' + Math.random()" class="page-item" :class="{ active: p === paginaActual, disabled: p === '...' }">
+                <button class="page-link" @click="typeof p === 'number' && (paginaActual = p)">{{ p }}</button>
+              </li>
+              <li class="page-item" :class="{ disabled: paginaActual === totalPaginas }">
+                <button class="page-link" @click="paginaActual++">&rsaquo;</button>
+              </li>
+            </ul>
+          </nav>
         </div>
 
       </div>
@@ -442,7 +500,7 @@ const ESTADO_CLASS = { F: 'badge-activo', R: 'badge-pendiente' }
               </div>
               <div class="detalle-item">
                 <span class="detalle-label">Monto</span>
-                <span class="detalle-monto">{{ detalleActual.Monto }}</span>
+                <span class="detalle-monto">{{ formatMonto(detalleActual.Monto) }}</span>
               </div>
               <div class="detalle-item">
                 <span class="detalle-label">Usuario</span>
@@ -521,7 +579,7 @@ const ESTADO_CLASS = { F: 'badge-activo', R: 'badge-pendiente' }
                 </div>
                 <div class="detalle-item">
                   <span class="detalle-label">Monto original</span>
-                  <span class="detalle-monto" style="font-size: 0.9375rem">{{ transferenciaARevertir.Monto }}</span>
+                  <span class="detalle-monto" style="font-size: 0.9375rem">{{ formatMonto(transferenciaARevertir.Monto) }}</span>
                 </div>
                 <div class="detalle-item">
                   <span class="detalle-label">Categoría</span>
@@ -568,6 +626,17 @@ const ESTADO_CLASS = { F: 'badge-activo', R: 'badge-pendiente' }
   border-bottom: 1px solid var(--border);
   text-transform: uppercase;
   letter-spacing: 0.04em;
+}
+
+.limite-aviso {
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  color: #92400E;
+  background: #FEF3C7;
+  padding: 0.2em 0.6em;
+  border-radius: 4px;
+  text-transform: none;
+  letter-spacing: 0;
 }
 
 .filtros-grid {

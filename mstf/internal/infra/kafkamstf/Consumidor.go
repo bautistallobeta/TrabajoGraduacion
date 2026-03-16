@@ -255,11 +255,11 @@ func (c *Consumidor) parseKafkaMessage(msg kafka.Message) (types.Transfer, model
 func obtenerTamanoLoteKafka() int {
 	p := &models.Parametros{Parametro: "KAFKABATCHSIZE"}
 	if _, err := p.Dame(); err != nil || p.Valor == "" {
-		return 1000
+		return 8000
 	}
 	val, err := strconv.Atoi(p.Valor)
 	if err != nil || val <= 0 {
-		return 1000
+		return 8000
 	}
 	return val
 }
@@ -267,11 +267,11 @@ func obtenerTamanoLoteKafka() int {
 func obtenerTimeoutLoteKafka() time.Duration {
 	p := &models.Parametros{Parametro: "KAFKABATCHTIMEOUTMS"}
 	if _, err := p.Dame(); err != nil || p.Valor == "" {
-		return 5000 * time.Millisecond
+		return 500 * time.Millisecond
 	}
 	val, err := strconv.Atoi(p.Valor)
 	if err != nil || val <= 0 {
-		return 5000 * time.Millisecond
+		return 500 * time.Millisecond
 	}
 	return time.Duration(val) * time.Millisecond
 }

@@ -1,7 +1,7 @@
 <script setup>
 import { ref, onMounted, onBeforeUnmount } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
-import { Modal } from 'bootstrap'
+import { Modal, Dropdown } from 'bootstrap'
 import { useAuth } from '../stores/auth'
 import cliente from '../api/cliente'
 import * as apiUsuarios from '../api/usuarios'
@@ -9,6 +9,10 @@ import * as apiUsuarios from '../api/usuarios'
 const router = useRouter()
 const route  = useRoute()
 const { nombreUsuario, cerrarSesion } = useAuth()
+
+const menuAbierto = ref(false)
+
+function cerrarMenu() { menuAbierto.value = false }
 
 const navLinks = [
   { name: 'usuarios',       label: 'Usuarios'       },
@@ -29,6 +33,10 @@ async function logout() {
   }
 }
 
+// Dropdown usuario
+const userDropdownEl = ref(null)
+let bsDropdown       = null
+
 // Modal cambiar contraseña
 const pwdModalEl  = ref(null)
 const formPwd     = ref({ PasswordAnterior: '', PasswordNuevo: '', ConfirmarPassword: '' })
@@ -37,6 +45,7 @@ const alertaPwd   = ref(null)
 let bsPwdModal    = null
 
 onMounted(() => {
+  bsDropdown = new Dropdown(userDropdownEl.value)
   bsPwdModal = new Modal(pwdModalEl.value)
   pwdModalEl.value.addEventListener('hidden.bs.modal', () => {
     formPwd.value  = { PasswordAnterior: '', PasswordNuevo: '', ConfirmarPassword: '' }
@@ -46,10 +55,17 @@ onMounted(() => {
 })
 
 onBeforeUnmount(() => {
+  bsDropdown?.dispose()
   bsPwdModal?.dispose()
 })
 
+function toggleDropdown() {
+  bsDropdown?.toggle()
+}
+
 function abrirCambiarPassword() {
+  bsDropdown?.hide()
+  cerrarMenu()
   bsPwdModal?.show()
 }
 
@@ -93,10 +109,10 @@ async function cambiarPassword() {
       <div class="navbar-actions">
         <div v-if="nombreUsuario" class="dropdown">
           <button
+            ref="userDropdownEl"
             class="navbar-user-btn dropdown-toggle"
             type="button"
-            data-bs-toggle="dropdown"
-            aria-expanded="false"
+            @click="toggleDropdown"
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0">
               <circle cx="12" cy="8" r="4"/><path d="M20 21a8 8 0 1 0-16 0"/>
@@ -125,7 +141,35 @@ async function cambiarPassword() {
         </div>
       </div>
 
+      <!-- Hamburger (solo mobile) -->
+      <button class="navbar-hamburger" @click="menuAbierto = !menuAbierto" aria-label="Menú">
+        <svg v-if="!menuAbierto" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/>
+        </svg>
+        <svg v-else width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+        </svg>
+      </button>
+
     </div>
+
+    <!-- Menú mobile desplegable -->
+    <div v-show="menuAbierto" class="navbar-mobile-menu">
+      <router-link
+        v-for="link in navLinks"
+        :key="link.name"
+        :to="{ name: link.name }"
+        class="mobile-nav-link"
+        :class="{ active: route.name === link.name }"
+        @click="cerrarMenu"
+      >
+        {{ link.label }}
+      </router-link>
+      <div class="mobile-nav-divider"></div>
+      <button class="mobile-nav-link" @click="abrirCambiarPassword">Cambiar contraseña</button>
+      <button class="mobile-nav-link mobile-nav-danger" @click="() => { cerrarMenu(); logout() }">Cerrar sesión</button>
+    </div>
+
   </nav>
 
   <!-- Modal cambiar contraseña -->
@@ -331,5 +375,63 @@ async function cambiarPassword() {
 :deep(.dropdown-divider) {
   margin: 0.375rem 0;
   border-color: var(--border);
+}
+
+/* Hamburger — oculto en desktop */
+.navbar-hamburger {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 0.375rem 0.5rem;
+  cursor: pointer;
+  color: var(--text-secondary);
+  flex-shrink: 0;
+}
+
+.navbar-mobile-menu {
+  display: flex;
+  flex-direction: column;
+  padding: 0.5rem 1rem 1rem;
+  border-top: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.mobile-nav-link {
+  font-family: var(--font-mono);
+  font-size: 0.9375rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+  text-decoration: none;
+  padding: 0.75rem 0.75rem;
+  border-radius: var(--radius-md);
+  border: none;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  display: block;
+  width: 100%;
+  transition: background-color var(--t-base), color var(--t-base);
+}
+
+.mobile-nav-link:hover { background: var(--gray-50); color: var(--text-primary); }
+.mobile-nav-link.active { color: var(--accent); background: var(--accent-bg); font-weight: 600; }
+.mobile-nav-danger { color: var(--error); }
+.mobile-nav-danger:hover { background: #FEE2E2; color: var(--error); }
+
+.mobile-nav-divider {
+  height: 1px;
+  background: var(--border);
+  margin: 0.375rem 0;
+}
+
+@media (max-width: 767px) {
+  .navbar-hamburger { display: flex; }
+  .navbar-links     { display: none !important; }
+  .navbar-actions   { display: none !important; }
+  .navbar-inner     { gap: 0; }
+  .navbar-brand     { margin-right: auto; }
 }
 </style>

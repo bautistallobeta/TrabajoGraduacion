@@ -3,11 +3,35 @@ import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { Modal } from 'bootstrap'
 import ConfirmModal from '../components/ConfirmModal.vue'
 import * as api from '../api/cuentas'
+import { dame as dameParametro } from '../api/parametros'
 
 const cuentas  = ref([])
 const cargando = ref(false)
 const total    = ref(0)
 const filtros  = ref({ idUsuarioFinal: '', idMoneda: '', estado: '' })
+
+const limiteCuentas       = ref(100)
+const paginaCuentas       = ref(1)
+const limiteDetalle       = ref(100)
+const paginaTransfs       = ref(1)
+const paginaHistorial     = ref(1)
+const POR_PAGINA          = 50
+
+function paginasBotones(paginaActual, totalPaginas) {
+  const tot = totalPaginas
+  const act = paginaActual
+  if (tot <= 7) return Array.from({ length: tot }, (_, i) => i + 1)
+  const pags = [1]
+  if (act > 3) pags.push('...')
+  for (let p = Math.max(2, act - 1); p <= Math.min(tot - 1, act + 1); p++) pags.push(p)
+  if (act < tot - 2) pags.push('...')
+  pags.push(tot)
+  return pags
+}
+
+const totalPaginasCuentas = computed(() => Math.max(1, Math.ceil(cuentas.value.length / POR_PAGINA)))
+const cuentasEnPagina     = computed(() => cuentas.value.slice((paginaCuentas.value - 1) * POR_PAGINA, paginaCuentas.value * POR_PAGINA))
+const botonesCuentas      = computed(() => paginasBotones(paginaCuentas.value, totalPaginasCuentas.value))
 
 const alerta = ref(null)
 let alertaTimer = null
@@ -20,6 +44,7 @@ function mostrarAlerta(tipo, mensaje) {
 
 async function buscar() {
   cargando.value = true
+  paginaCuentas.value = 1
   try {
     const res = await api.buscar({
       idUsuarioFinal: filtros.value.idUsuarioFinal || undefined,
@@ -35,7 +60,19 @@ async function buscar() {
   }
 }
 
-onMounted(buscar)
+onMounted(async () => {
+  try {
+    const [pC, pD] = await Promise.all([
+      dameParametro('LIMITEBUSCARCUENTAS'),
+      dameParametro('LIMITEHISTORIALBALANCE')
+    ])
+    const vC = parseInt(pC.Valor)
+    const vD = parseInt(pD.Valor)
+    if (!isNaN(vC) && vC > 0) limiteCuentas.value = vC
+    if (!isNaN(vD) && vD > 0) limiteDetalle.value = vD
+  } catch { /* usa los defaults */ }
+  buscar()
+})
 
 // Modal p crear
 const crearModalEl = ref(null)
@@ -143,12 +180,14 @@ function desactivar(c) {
   )
 }
 
-// Helpers
+const _fmt = new Intl.NumberFormat('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+function formatMonto(v) { return _fmt.format(parseFloat(v) || 0) }
+
 function balance(c) {
   const cr = parseFloat(c.Creditos) || 0
   const db = parseFloat(c.Debitos)  || 0
   const b  = cr - db
-  return (b >= 0 ? '+' : '') + b.toFixed(2)
+  return (b > 0 ? '+' : '') + _fmt.format(b)
 }
 
 function balanceClass(c) {
@@ -178,13 +217,15 @@ function verDetalle(c) {
 }
 
 function volverALista() {
-  cuentaSeleccionada.value = null
-  detalleTransfs.value     = []
+  cuentaSeleccionada.value  = null
+  detalleTransfs.value      = []
   detalleTransfsTotal.value = 0
-  historial.value          = []
-  historialTotal.value     = 0
-  filtrosTransfs.value     = { timestampMin: '', timestampMax: '', incluyeRevertidas: false }
-  filtrosHistorial.value   = { timestampMin: '', timestampMax: '' }
+  historial.value           = []
+  historialTotal.value      = 0
+  paginaTransfs.value       = 1
+  paginaHistorial.value     = 1
+  filtrosTransfs.value      = { timestampMin: '', timestampMax: '', incluyeRevertidas: false }
+  filtrosHistorial.value    = { timestampMin: '', timestampMax: '' }
 }
 
 // Sub-tab: Transferencias de la cuenta
@@ -193,9 +234,14 @@ const detalleTransfsTotal = ref(0)
 const cargandoTransfs     = ref(false)
 const filtrosTransfs      = ref({ timestampMin: '', timestampMax: '', incluyeRevertidas: false })
 
+const totalPaginasTransfs = computed(() => Math.max(1, Math.ceil(detalleTransfs.value.length / POR_PAGINA)))
+const transfsEnPagina     = computed(() => detalleTransfs.value.slice((paginaTransfs.value - 1) * POR_PAGINA, paginaTransfs.value * POR_PAGINA))
+const botonesTransfs      = computed(() => paginasBotones(paginaTransfs.value, totalPaginasTransfs.value))
+
 async function cargarTransfs() {
   if (!cuentaSeleccionada.value) return
   cargandoTransfs.value = true
+  paginaTransfs.value = 1
   try {
     const res = await api.dameTransferencias(
       cuentaSeleccionada.value.IdUsuarioFinal,
@@ -212,14 +258,19 @@ async function cargarTransfs() {
 }
 
 // Sub-tab: Historial de balances
-const historial        = ref([])
-const historialTotal   = ref(0)
+const historial         = ref([])
+const historialTotal    = ref(0)
 const cargandoHistorial = ref(false)
 const filtrosHistorial  = ref({ timestampMin: '', timestampMax: '' })
+
+const totalPaginasHistorial = computed(() => Math.max(1, Math.ceil(historial.value.length / POR_PAGINA)))
+const historialEnPagina     = computed(() => historial.value.slice((paginaHistorial.value - 1) * POR_PAGINA, paginaHistorial.value * POR_PAGINA))
+const botonesHistorial      = computed(() => paginasBotones(paginaHistorial.value, totalPaginasHistorial.value))
 
 async function cargarHistorial() {
   if (!cuentaSeleccionada.value) return
   cargandoHistorial.value = true
+  paginaHistorial.value = 1
   try {
     const res = await api.dameHistorial(
       cuentaSeleccionada.value.IdUsuarioFinal,
@@ -262,14 +313,12 @@ const TTRANS_ESTADO_CLASS = { F: 'badge-activo', R: 'badge-pendiente' }
       <button type="button" class="btn-close" @click="alerta = null"></button>
     </div>
 
-    <!--  Vista lista  -->
     <template v-if="!cuentaSeleccionada">
 
     <div class="section-header mb-4">
       <h1 class="page-title">Cuentas</h1>
     </div>
 
-    <!-- Filtros -->
     <div class="card mb-3">
       <div class="card-body py-3">
         <div class="d-flex align-items-end justify-content-between gap-3 flex-wrap">
@@ -304,14 +353,14 @@ const TTRANS_ESTADO_CLASS = { F: 'badge-activo', R: 'badge-pendiente' }
                 <option value="I">Inactiva</option>
               </select>
             </div>
-            <div style="padding-bottom: 2px">
-              <button type="submit" class="btn btn-outline-primary btn-sm" :disabled="cargando">
+            <div>
+              <button type="submit" class="btn btn-outline-primary" :disabled="cargando">
                 Buscar
               </button>
             </div>
           </form>
-          <div style="padding-bottom: 2px">
-            <button type="button" class="btn btn-primary btn-sm" @click="abrirModalCrear">
+          <div>
+            <button type="button" class="btn btn-primary" @click="abrirModalCrear">
               + Crear cuenta
             </button>
           </div>
@@ -319,7 +368,6 @@ const TTRANS_ESTADO_CLASS = { F: 'badge-activo', R: 'badge-pendiente' }
       </div>
     </div>
 
-    <!-- Tabla -->
     <div class="card">
       <div class="card-body p-0">
 
@@ -336,8 +384,11 @@ const TTRANS_ESTADO_CLASS = { F: 'badge-activo', R: 'badge-pendiente' }
         </div>
 
         <div v-else class="table-responsive">
-          <div class="total-row">
-            {{ total }} resultado{{ total !== 1 ? 's' : '' }}
+          <div class="total-row d-flex align-items-center justify-content-between">
+            <span>{{ total }} resultado{{ total !== 1 ? 's' : '' }}</span>
+            <span v-if="total === limiteCuentas" class="limite-aviso">
+              Se alcanzó el límite de búsqueda. Acotar los filtros para resultados más precisos.
+            </span>
           </div>
           <table class="table mb-0">
             <thead>
@@ -347,25 +398,27 @@ const TTRANS_ESTADO_CLASS = { F: 'badge-activo', R: 'badge-pendiente' }
                 <th class="text-end">Créditos</th>
                 <th class="text-end">Débitos</th>
                 <th class="text-end">Balance</th>
+                <th>Fecha Alta</th>
+                <th>Fecha Proceso</th>
                 <th>Estado</th>
-                <th>Fecha</th>
                 <th style="width: 1%; white-space: nowrap">Acciones</th>
               </tr>
             </thead>
             <tbody>
-              <tr v-for="c in cuentas" :key="`${c.IdUsuarioFinal}-${c.IdMoneda}`">
+              <tr v-for="c in cuentasEnPagina" :key="`${c.IdUsuarioFinal}-${c.IdMoneda}`">
                 <td class="cell-id">{{ c.IdUsuarioFinal }}</td>
                 <td class="cell-id">{{ c.IdMoneda }}</td>
-                <td class="cell-monto">{{ c.Creditos }}</td>
-                <td class="cell-monto">{{ c.Debitos }}</td>
+                <td class="cell-monto">{{ formatMonto(c.Creditos) }}</td>
+                <td class="cell-monto">{{ formatMonto(c.Debitos) }}</td>
                 <td :class="`cell-monto ${balanceClass(c)}`">{{ balance(c) }}</td>
+                <td>{{ formatFecha(c.Fecha) }}</td>
+                <td class="cell-id">{{ formatTimestamp(c.FechaProceso) }}</td>
                 <td>
                   <span v-if="c.IdUsuarioFinal === 0" class="badge badge-empresa">Empresa</span>
                   <span v-else :class="`badge ${ESTADO_CLASS[c.Estado] ?? ''}`">
                     {{ ESTADO_LABEL[c.Estado] ?? c.Estado }}
                   </span>
                 </td>
-                <td>{{ formatFecha(c.Fecha) }}</td>
                 <td style="white-space: nowrap">
                   <div class="d-flex gap-1">
                     <button
@@ -373,8 +426,8 @@ const TTRANS_ESTADO_CLASS = { F: 'badge-activo', R: 'badge-pendiente' }
                       title="Ver detalle"
                       @click="verDetalle(c)"
                     >
-                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="10"/><line x1="12" y1="12" x2="12" y2="16"/><line x1="12" y1="8" x2="12.01" y2="8"/>
                       </svg>
                     </button>
                     <button
@@ -383,7 +436,7 @@ const TTRANS_ESTADO_CLASS = { F: 'badge-activo', R: 'badge-pendiente' }
                       title="Activar"
                       @click="activar(c)"
                     >
-                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                         <path d="M9 12l2 2 4-4"/><circle cx="12" cy="12" r="10"/>
                       </svg>
                     </button>
@@ -393,7 +446,7 @@ const TTRANS_ESTADO_CLASS = { F: 'badge-activo', R: 'badge-pendiente' }
                       title="Desactivar"
                       @click="desactivar(c)"
                     >
-                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                         <circle cx="12" cy="12" r="10"/><line x1="8" y1="12" x2="16" y2="12"/>
                       </svg>
                     </button>
@@ -402,12 +455,24 @@ const TTRANS_ESTADO_CLASS = { F: 'badge-activo', R: 'badge-pendiente' }
               </tr>
             </tbody>
           </table>
+          <nav v-if="totalPaginasCuentas > 1" class="d-flex justify-content-center py-3">
+            <ul class="pagination pagination-sm mb-0">
+              <li class="page-item" :class="{ disabled: paginaCuentas === 1 }">
+                <button class="page-link" @click="paginaCuentas--">&lsaquo;</button>
+              </li>
+              <li v-for="p in botonesCuentas" :key="String(p)" class="page-item" :class="{ active: p === paginaCuentas, disabled: p === '...' }">
+                <button class="page-link" @click="typeof p === 'number' && (paginaCuentas = p)">{{ p }}</button>
+              </li>
+              <li class="page-item" :class="{ disabled: paginaCuentas === totalPaginasCuentas }">
+                <button class="page-link" @click="paginaCuentas++">&rsaquo;</button>
+              </li>
+            </ul>
+          </nav>
         </div>
 
       </div>
     </div>
 
-    <!-- Modal crear cuenta -->
     <div ref="crearModalEl" class="modal fade" tabindex="-1" aria-hidden="true">
       <div class="modal-dialog modal-dialog-centered" style="max-width: 380px">
         <div class="modal-content">
@@ -482,12 +547,9 @@ const TTRANS_ESTADO_CLASS = { F: 'badge-activo', R: 'badge-pendiente' }
     />
 
     </template>
-    <!-- fin lista -->
 
-    <!--  Vista detalle de cuenta  -->
     <template v-if="cuentaSeleccionada">
 
-      <!-- Header con volver -->
       <div class="section-header mb-4">
         <div class="d-flex align-items-center gap-3">
           <button class="btn btn-outline-secondary btn-sm d-flex align-items-center gap-1" @click="volverALista">
@@ -500,7 +562,6 @@ const TTRANS_ESTADO_CLASS = { F: 'badge-activo', R: 'badge-pendiente' }
         </div>
       </div>
 
-      <!-- Info de la cuenta -->
       <div class="card mb-4">
         <div class="card-body">
           <div class="cuenta-info-grid">
@@ -524,11 +585,11 @@ const TTRANS_ESTADO_CLASS = { F: 'badge-activo', R: 'badge-pendiente' }
             </div>
             <div class="info-item">
               <span class="info-label">Créditos</span>
-              <span class="info-value mono" style="color: var(--success)">{{ cuentaSeleccionada.Creditos }}</span>
+              <span class="info-value mono" style="color: var(--success)">{{ formatMonto(cuentaSeleccionada.Creditos) }}</span>
             </div>
             <div class="info-item">
               <span class="info-label">Débitos</span>
-              <span class="info-value mono" style="color: var(--error)">{{ cuentaSeleccionada.Debitos }}</span>
+              <span class="info-value mono" style="color: var(--error)">{{ formatMonto(cuentaSeleccionada.Debitos) }}</span>
             </div>
             <div class="info-item">
               <span class="info-label">Balance</span>
@@ -540,7 +601,6 @@ const TTRANS_ESTADO_CLASS = { F: 'badge-activo', R: 'badge-pendiente' }
         </div>
       </div>
 
-      <!-- Sub-tabs -->
       <ul class="nav nav-tabs mb-0">
         <li class="nav-item">
           <a
@@ -560,7 +620,6 @@ const TTRANS_ESTADO_CLASS = { F: 'badge-activo', R: 'badge-pendiente' }
         </li>
       </ul>
 
-      <!-- Tab: Transferencias -->
       <div v-if="tabActiva === 'transferencias'" class="card" style="border-top-left-radius: 0">
         <div class="card-body py-3 border-bottom">
           <form @submit.prevent="cargarTransfs" class="d-flex align-items-end gap-3 flex-wrap">
@@ -583,8 +642,8 @@ const TTRANS_ESTADO_CLASS = { F: 'badge-activo', R: 'badge-pendiente' }
                 <label for="incluyeRevertidas" class="form-label mb-0" style="white-space: nowrap">Incl. revertidas</label>
               </div>
             </div>
-            <div style="padding-bottom: 2px">
-              <button type="submit" class="btn btn-outline-primary btn-sm" :disabled="cargandoTransfs">Buscar</button>
+            <div>
+              <button type="submit" class="btn btn-outline-primary" :disabled="cargandoTransfs">Buscar</button>
             </div>
           </form>
         </div>
@@ -601,7 +660,12 @@ const TTRANS_ESTADO_CLASS = { F: 'badge-activo', R: 'badge-pendiente' }
             <p>No se encontraron transferencias</p>
           </div>
           <div v-else class="table-responsive">
-            <div class="total-row">{{ detalleTransfsTotal }} resultado{{ detalleTransfsTotal !== 1 ? 's' : '' }}</div>
+            <div class="total-row d-flex align-items-center justify-content-between">
+              <span>{{ detalleTransfsTotal }} resultado{{ detalleTransfsTotal !== 1 ? 's' : '' }}</span>
+              <span v-if="detalleTransfsTotal === limiteDetalle" class="limite-aviso">
+                Se alcanzó el límite de búsqueda. Acotar los filtros para resultados más precisos.
+              </span>
+            </div>
             <table class="table mb-0">
               <thead>
                 <tr>
@@ -615,7 +679,7 @@ const TTRANS_ESTADO_CLASS = { F: 'badge-activo', R: 'badge-pendiente' }
                 </tr>
               </thead>
               <tbody>
-                <tr v-for="t in detalleTransfs" :key="t.IdTransferencia">
+                <tr v-for="t in transfsEnPagina" :key="t.IdTransferencia">
                   <td class="cell-mono" style="font-size: 0.75rem; max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap">
                     {{ t.IdTransferencia }}
                   </td>
@@ -626,7 +690,7 @@ const TTRANS_ESTADO_CLASS = { F: 'badge-activo', R: 'badge-pendiente' }
                     <span v-else class="text-muted">—</span>
                   </td>
                   <td class="cell-id">{{ t.Categoria }}</td>
-                  <td class="cell-monto">{{ t.Monto }}</td>
+                  <td class="cell-monto">{{ formatMonto(t.Monto) }}</td>
                   <td>
                     <span :class="`badge ${TTRANS_ESTADO_CLASS[t.Estado] ?? ''}`">
                       {{ TTRANS_ESTADO_LABEL[t.Estado] ?? t.Estado }}
@@ -637,11 +701,23 @@ const TTRANS_ESTADO_CLASS = { F: 'badge-activo', R: 'badge-pendiente' }
                 </tr>
               </tbody>
             </table>
+            <nav v-if="totalPaginasTransfs > 1" class="d-flex justify-content-center py-3">
+              <ul class="pagination pagination-sm mb-0">
+                <li class="page-item" :class="{ disabled: paginaTransfs === 1 }">
+                  <button class="page-link" @click="paginaTransfs--">&lsaquo;</button>
+                </li>
+                <li v-for="p in botonesTransfs" :key="String(p)" class="page-item" :class="{ active: p === paginaTransfs, disabled: p === '...' }">
+                  <button class="page-link" @click="typeof p === 'number' && (paginaTransfs = p)">{{ p }}</button>
+                </li>
+                <li class="page-item" :class="{ disabled: paginaTransfs === totalPaginasTransfs }">
+                  <button class="page-link" @click="paginaTransfs++">&rsaquo;</button>
+                </li>
+              </ul>
+            </nav>
           </div>
         </div>
       </div>
 
-      <!-- Tab: Historial de balances -->
       <div v-if="tabActiva === 'historial'" class="card" style="border-top-left-radius: 0">
         <div class="card-body py-3 border-bottom">
           <form @submit.prevent="cargarHistorial" class="d-flex align-items-end gap-3 flex-wrap">
@@ -653,8 +729,8 @@ const TTRANS_ESTADO_CLASS = { F: 'badge-activo', R: 'badge-pendiente' }
               <label class="form-label">Hasta</label>
               <input v-model="filtrosHistorial.timestampMax" type="datetime-local" class="form-control" style="width: 195px" />
             </div>
-            <div style="padding-bottom: 2px">
-              <button type="submit" class="btn btn-outline-primary btn-sm" :disabled="cargandoHistorial">Buscar</button>
+            <div>
+              <button type="submit" class="btn btn-outline-primary" :disabled="cargandoHistorial">Buscar</button>
             </div>
           </form>
         </div>
@@ -671,7 +747,12 @@ const TTRANS_ESTADO_CLASS = { F: 'badge-activo', R: 'badge-pendiente' }
             <p>No se encontró historial de balances</p>
           </div>
           <div v-else class="table-responsive">
-            <div class="total-row">{{ historialTotal }} registro{{ historialTotal !== 1 ? 's' : '' }}</div>
+            <div class="total-row d-flex align-items-center justify-content-between">
+              <span>{{ historialTotal }} registro{{ historialTotal !== 1 ? 's' : '' }}</span>
+              <span v-if="historialTotal === limiteDetalle" class="limite-aviso">
+                Se alcanzó el límite de búsqueda. Acotar los filtros para resultados más precisos.
+              </span>
+            </div>
             <table class="table mb-0">
               <thead>
                 <tr>
@@ -682,22 +763,34 @@ const TTRANS_ESTADO_CLASS = { F: 'badge-activo', R: 'badge-pendiente' }
                 </tr>
               </thead>
               <tbody>
-                <tr v-for="(h, i) in historial" :key="i">
+                <tr v-for="(h, i) in historialEnPagina" :key="i">
                   <td style="font-family: var(--font-mono); font-size: 0.8rem; color: var(--text-secondary)">
                     {{ formatTimestamp(h.Fecha) }}
                   </td>
-                  <td class="cell-monto" style="color: var(--success)">{{ h.Creditos }}</td>
-                  <td class="cell-monto" style="color: var(--error)">{{ h.Debitos }}</td>
-                  <td class="cell-monto" style="font-weight: 600">{{ h.Balance }}</td>
+                  <td class="cell-monto" style="color: var(--success)">{{ formatMonto(h.Creditos) }}</td>
+                  <td class="cell-monto" style="color: var(--error)">{{ formatMonto(h.Debitos) }}</td>
+                  <td class="cell-monto" style="font-weight: 600">{{ formatMonto(h.Balance) }}</td>
                 </tr>
               </tbody>
             </table>
+            <nav v-if="totalPaginasHistorial > 1" class="d-flex justify-content-center py-3">
+              <ul class="pagination pagination-sm mb-0">
+                <li class="page-item" :class="{ disabled: paginaHistorial === 1 }">
+                  <button class="page-link" @click="paginaHistorial--">&lsaquo;</button>
+                </li>
+                <li v-for="p in botonesHistorial" :key="String(p)" class="page-item" :class="{ active: p === paginaHistorial, disabled: p === '...' }">
+                  <button class="page-link" @click="typeof p === 'number' && (paginaHistorial = p)">{{ p }}</button>
+                </li>
+                <li class="page-item" :class="{ disabled: paginaHistorial === totalPaginasHistorial }">
+                  <button class="page-link" @click="paginaHistorial++">&rsaquo;</button>
+                </li>
+              </ul>
+            </nav>
           </div>
         </div>
       </div>
 
     </template>
-    <!-- fin detalle -->
 
   </div>
 </template>
@@ -724,6 +817,17 @@ const TTRANS_ESTADO_CLASS = { F: 'badge-activo', R: 'badge-pendiente' }
   border-bottom: 1px solid var(--border);
   text-transform: uppercase;
   letter-spacing: 0.04em;
+}
+
+.limite-aviso {
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  color: #92400E;
+  background: #FEF3C7;
+  padding: 0.2em 0.6em;
+  border-radius: 4px;
+  text-transform: none;
+  letter-spacing: 0;
 }
 
 .badge-empresa {

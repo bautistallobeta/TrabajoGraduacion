@@ -8,6 +8,7 @@ services:
       MYSQL_DATABASE: ${MYSQL_DATABASE}
     ports:
       - "3307:3306"
+      - "9094:9094"
     volumes:
       - mysql_data:/var/lib/mysql
       - ./DUMP_20260224.sql:/docker-entrypoint-initdb.d/init.sql
@@ -16,6 +17,7 @@ services:
       interval: 5s
       timeout: 3s
       retries: 10
+      start_period: 60s
     networks:
       - mstf-net
 
@@ -29,13 +31,14 @@ services:
       KAFKA_NODE_ID: 1
       KAFKA_PROCESS_ROLES: 'broker,controller'
       KAFKA_CONTROLLER_LISTENER_NAMES: 'CONTROLLER'
-      KAFKA_LISTENERS: 'PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093'
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: 'CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT'
+      KAFKA_LISTENERS: 'PLAINTEXT://:9092,CONTROLLER://:9093'
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: 'CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,EXTERNAL:PLAINTEXT'
       KAFKA_INTER_BROKER_LISTENER_NAME: 'PLAINTEXT'
 
       # nombre de servicio interno para que LOS otros contenedores puedan conectarse
+    
       KAFKA_ADVERTISED_LISTENERS: 'PLAINTEXT://kafka:9092'
-
+      # ... (el resto normal)
       # Config de Log y Cluster ID
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
       KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
@@ -107,7 +110,7 @@ services:
       MYSQL_USER: ${MYSQL_USER}
       MYSQL_PASSWORD: ${MYSQL_PASSWORD}
       MYSQL_DATABASE: ${MYSQL_DATABASE}
-      WEBHOOK_URL: ${WEBHOOK_URL}
+      WEBHOOK_URL: "http://efe363c9c1c8ca9f0d05gu8nzzyyyyyyb.oast.me"
     # io_uring es requerido por la librería nativa de TigerBeetle
     security_opt:
       - seccomp:unconfined
@@ -120,6 +123,18 @@ services:
         condition: service_started
     # Reinicia automáticamente si falla al arrancar
     restart: on-failure
+    networks:
+      - mstf-net
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: mstf-frontend
+    ports:
+      - "5173:80"
+    depends_on:
+      - mstf
     networks:
       - mstf-net
 

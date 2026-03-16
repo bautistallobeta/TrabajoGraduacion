@@ -30,4 +30,9 @@ import AppNavbar from './AppNavbar.vue'
   margin: 0 auto;
   padding: 0 1.5rem;
 }
+
+@media (max-width: 767px) {
+  .main-content    { padding: 1rem 0; }
+  .content-wrapper { padding: 0 0.75rem; }
+}
 </style>

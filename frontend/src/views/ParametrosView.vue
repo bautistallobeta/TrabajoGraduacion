@@ -29,7 +29,7 @@ async function buscar() {
 
 onMounted(buscar)
 
-// Modal p editar
+// modal editar
 const editModalEl  = ref(null)
 const editando     = ref(null)
 const nuevoValor   = ref('')
@@ -86,14 +86,14 @@ async function guardar() {
 
     <div class="card mb-3">
       <div class="card-body py-3">
-        <form @submit.prevent="buscar" class="d-flex align-items-end gap-3">
+        <form @submit.prevent="buscar" class="d-flex align-items-end gap-3 flex-wrap">
           <div>
             <label class="form-label">Buscar</label>
             <input
               v-model="filtros.cadena"
               type="text"
               class="form-control"
-              style="width: 260px"
+              style="width: 260px; max-width: 100%"
               placeholder="Nombre del parámetro..."
             />
           </div>

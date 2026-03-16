@@ -154,7 +154,7 @@ function borrar(m) {
 
 // Helpers
 function formatFecha(f) {
-  return f ? f.slice(0, 10) : '—'
+  return f ? f.slice(0, 19).replace('T', ' ') : '—'
 }
 
 const ESTADO_LABEL = { A: 'Activa', I: 'Inactiva' }
