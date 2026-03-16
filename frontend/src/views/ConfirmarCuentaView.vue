@@ -1,5 +1,5 @@
 <script setup>
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuth } from '../stores/auth'
 import { confirmarCuenta } from '../api/usuarios'
@@ -11,8 +11,15 @@ const form = ref({ password: '', confirmarPassword: '' })
 const cargando = ref(false)
 const error = ref(null)
 
+const errorCoincidencia = computed(() => {
+  if (form.value.confirmarPassword && form.value.password !== form.value.confirmarPassword)
+    return 'Las contraseñas no coinciden.'
+  return null
+})
+
 async function confirmar() {
   if (!form.value.password || !form.value.confirmarPassword) return
+  if (errorCoincidencia.value) return
   cargando.value = true
   error.value = null
   try {
@@ -68,13 +75,15 @@ async function confirmar() {
             v-model="form.confirmarPassword"
             type="password"
             class="form-control"
+            :class="{ 'is-invalid': errorCoincidencia }"
             autocomplete="new-password"
             :disabled="cargando"
             required
           />
+          <div v-if="errorCoincidencia" class="invalid-feedback">{{ errorCoincidencia }}</div>
         </div>
 
-        <button type="submit" class="btn btn-primary w-100 confirm-btn" :disabled="cargando">
+        <button type="submit" class="btn btn-primary w-100 confirm-btn" :disabled="cargando || !!errorCoincidencia">
           <span v-if="cargando" class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
           {{ cargando ? 'Activando cuenta...' : 'Activar cuenta' }}
         </button>

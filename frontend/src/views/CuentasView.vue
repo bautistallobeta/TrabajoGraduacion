@@ -15,6 +15,8 @@ import {
 import * as api from '../api/cuentas'
 import { dame as dameParametro } from '../api/parametros'
 
+const esDemo = import.meta.env.VITE_DEMO_MODE === 'true'
+
 const cuentas  = ref([])
 const cargando = ref(false)
 const total    = ref(0)
@@ -286,7 +288,7 @@ function cambiarTab(tab) {
               </button>
             </div>
           </form>
-          <div>
+          <div v-if="esDemo">
             <button type="button" class="btn btn-primary" @click="abrirModalCrear">
               + Crear cuenta
             </button>

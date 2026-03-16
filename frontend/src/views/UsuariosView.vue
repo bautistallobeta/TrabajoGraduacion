@@ -190,13 +190,13 @@ async function restablecerPassword(u) {
                 </div>
               </div>
               <div style="padding-bottom: 2px">
-                <button type="submit" class="btn btn-outline-primary btn-sm" :disabled="cargando">
+                <button type="submit" class="btn btn-outline-primary" :disabled="cargando">
                   Buscar
                 </button>
               </div>
             </form>
             <div style="padding-bottom: 2px">
-              <button type="button" class="btn btn-primary btn-sm" @click="abrirModalCrear">
+              <button type="button" class="btn btn-primary" @click="abrirModalCrear">
                 + Crear usuario
               </button>
             </div>
@@ -308,11 +308,15 @@ async function restablecerPassword(u) {
                   v-model="nuevoUsuario"
                   type="text"
                   class="form-control"
+                  :class="{ 'is-invalid': nuevoUsuario.trim() && nuevoUsuario.trim().length < 3 }"
                   placeholder="ej: juan.perez"
                   :disabled="creandoUsuario"
                   required
                   autofocus
                 />
+                <div v-if="nuevoUsuario.trim() && nuevoUsuario.trim().length < 3" class="invalid-feedback">
+                  El nombre de usuario debe tener al menos 3 caracteres.
+                </div>
                 <div class="form-text mt-2">
                   El usuario se creará en estado Pendiente con una contraseña temporal generada automáticamente.
                 </div>
@@ -325,7 +329,7 @@ async function restablecerPassword(u) {
               <button
                 type="submit"
                 class="btn btn-primary btn-sm"
-                :disabled="creandoUsuario || !nuevoUsuario.trim()"
+                :disabled="creandoUsuario || !nuevoUsuario.trim() || nuevoUsuario.trim().length < 3"
               >
                 <span v-if="creandoUsuario" class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
                 Crear

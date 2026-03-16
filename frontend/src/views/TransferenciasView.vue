@@ -12,6 +12,8 @@ import {
 import * as api from '../api/transferencias'
 import { dame as dameParametro } from '../api/parametros'
 
+const esDemo = import.meta.env.VITE_DEMO_MODE === 'true'
+
 const transferencias = ref([])
 const cargando       = ref(false)
 const total          = ref(0)
@@ -183,7 +185,7 @@ async function realizarReversion() {
 
     <div class="section-header mb-4">
       <h1 class="page-title">Transferencias</h1>
-      <button type="button" class="btn btn-success" @click="abrirModalCrear">
+      <button v-if="esDemo" type="button" class="btn btn-success" @click="abrirModalCrear">
         + Nueva transferencia (demo)
       </button>
     </div>
@@ -462,7 +464,7 @@ async function realizarReversion() {
           <div class="modal-footer">
             <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Cerrar</button>
             <button
-              v-if="detalleActual.Tipo !== 'R' && detalleActual.Estado !== 'R'"
+              v-if="esDemo && detalleActual.Tipo !== 'R' && detalleActual.Estado !== 'R'"
               type="button"
               class="btn btn-outline-danger btn-sm"
               @click="abrirReversion(detalleActual)"

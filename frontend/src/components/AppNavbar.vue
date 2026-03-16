@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted, onBeforeUnmount } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { Modal, Dropdown } from 'bootstrap'
 import { useAuth } from '../stores/auth'
@@ -69,7 +69,15 @@ function abrirCambiarPassword() {
   bsPwdModal?.show()
 }
 
+const errorCoincidencia = computed(() => {
+  const nuevo     = formPwd.value.PasswordNuevo
+  const confirmar = formPwd.value.ConfirmarPassword
+  if (confirmar && nuevo !== confirmar) return 'Las contraseñas no coinciden.'
+  return null
+})
+
 async function cambiarPassword() {
+  if (errorCoincidencia.value) return
   cambiando.value = true
   alertaPwd.value = null
   try {
@@ -212,10 +220,12 @@ async function cambiarPassword() {
                 v-model="formPwd.ConfirmarPassword"
                 type="password"
                 class="form-control"
+                :class="{ 'is-invalid': errorCoincidencia }"
                 autocomplete="new-password"
                 :disabled="cambiando"
                 required
               />
+              <div v-if="errorCoincidencia" class="invalid-feedback">{{ errorCoincidencia }}</div>
             </div>
           </div>
           <div class="modal-footer">
@@ -223,7 +233,7 @@ async function cambiarPassword() {
             <button
               type="submit"
               class="btn btn-primary btn-sm"
-              :disabled="cambiando || !formPwd.PasswordAnterior || !formPwd.PasswordNuevo || !formPwd.ConfirmarPassword"
+              :disabled="cambiando || !formPwd.PasswordAnterior || !formPwd.PasswordNuevo || !formPwd.ConfirmarPassword || !!errorCoincidencia"
             >
               <span v-if="cambiando" class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
               Guardar

@@ -7,6 +7,8 @@ import { useConfirmModal } from '../composables/useConfirmModal'
 import { formatTimestamp as formatFecha, ESTADO_MONEDA_LABEL as ESTADO_LABEL, ESTADO_MONEDA_CLASS as ESTADO_CLASS } from '../utils/formatters'
 import * as api from '../api/monedas'
 
+const esDemo = import.meta.env.VITE_DEMO_MODE === 'true'
+
 const monedas = ref([])
 const cargando = ref(false)
 const filtros  = ref({ incluyeInactivos: false })
@@ -147,13 +149,13 @@ function borrar(m) {
               <label for="incluyeInactivos" class="form-label mb-0">Incluir inactivas</label>
             </div>
             <div>
-              <button type="submit" class="btn btn-outline-primary btn-sm" :disabled="cargando">
+              <button type="submit" class="btn btn-outline-primary" :disabled="cargando">
                 Actualizar
               </button>
             </div>
           </form>
-          <div>
-            <button type="button" class="btn btn-primary btn-sm" @click="abrirModalCrear">
+          <div v-if="esDemo">
+            <button type="button" class="btn btn-primary" @click="abrirModalCrear">
               + Crear moneda
             </button>
           </div>
@@ -220,6 +222,7 @@ function borrar(m) {
                       </svg>
                     </button>
                     <button
+                      v-if="esDemo"
                       class="btn btn-outline-danger btn-icon"
                       title="Borrar"
                       @click="borrar(m)"

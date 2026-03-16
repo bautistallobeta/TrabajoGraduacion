@@ -84,7 +84,7 @@ async function guardar() {
             />
           </div>
           <div style="padding-bottom: 2px">
-            <button type="submit" class="btn btn-outline-primary btn-sm" :disabled="cargando">
+            <button type="submit" class="btn btn-outline-primary" :disabled="cargando">
               Buscar
             </button>
           </div>
