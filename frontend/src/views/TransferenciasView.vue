@@ -1,38 +1,23 @@
 <script setup>
-import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
-import { Modal } from 'bootstrap'
+import { ref, onMounted } from 'vue'
+import { useAlert } from '../composables/useAlert'
+import { useModal } from '../composables/useModal'
+import { usePagination } from '../composables/usePagination'
+import Paginacion from '../components/Paginacion.vue'
+import {
+  formatFecha, formatTimestamp, formatMonto, hoy,
+  TIPO_LABEL, TIPO_CLASS,
+  ESTADO_TRANS_LABEL as ESTADO_LABEL, ESTADO_TRANS_CLASS as ESTADO_CLASS
+} from '../utils/formatters'
 import * as api from '../api/transferencias'
 import { dame as dameParametro } from '../api/parametros'
 
 const transferencias = ref([])
 const cargando       = ref(false)
 const total          = ref(0)
+const limite         = ref(100)
 
-const limite       = ref(100)
-const paginaActual = ref(1)
-const POR_PAGINA   = 50
-
-const totalPaginas = computed(() => Math.max(1, Math.ceil(transferencias.value.length / POR_PAGINA)))
-
-const transferenciasEnPagina = computed(() =>
-  transferencias.value.slice((paginaActual.value - 1) * POR_PAGINA, paginaActual.value * POR_PAGINA)
-)
-
-const paginasBotones = computed(() => {
-  const tot = totalPaginas.value
-  const act = paginaActual.value
-  if (tot <= 7) return Array.from({ length: tot }, (_, i) => i + 1)
-  const pags = [1]
-  if (act > 3) pags.push('...')
-  for (let p = Math.max(2, act - 1); p <= Math.min(tot - 1, act + 1); p++) pags.push(p)
-  if (act < tot - 2) pags.push('...')
-  pags.push(tot)
-  return pags
-})
-
-function hoy() {
-  return new Date().toISOString().slice(0, 10)
-}
+const { paginaActual, totalPaginas, itemsEnPagina: transferenciasEnPagina, botones: paginasBotones } = usePagination(transferencias)
 
 const filtros = ref({
   idTransferencia:   '',
@@ -46,14 +31,7 @@ const filtros = ref({
   incluyeRevertidas: false
 })
 
-const alerta = ref(null)
-let alertaTimer = null
-
-function mostrarAlerta(tipo, mensaje) {
-  clearTimeout(alertaTimer)
-  alerta.value = { tipo, mensaje }
-  alertaTimer = setTimeout(() => { alerta.value = null }, 4000)
-}
+const { alerta, mostrarAlerta } = useAlert()
 
 async function buscar() {
   cargando.value = true
@@ -93,24 +71,15 @@ onMounted(async () => {
 const detalleModalEl  = ref(null)
 const detalleActual   = ref(null)
 const cargandoDetalle = ref(false)
-let bsDetalleModal    = null
 
-onMounted(() => {
-  bsDetalleModal = new Modal(detalleModalEl.value)
-  detalleModalEl.value.addEventListener('hidden.bs.modal', () => {
-    detalleActual.value = null
-    cargandoDetalle.value = false
-  })
-})
-
-onBeforeUnmount(() => {
-  bsDetalleModal?.dispose()
+const detalleModal = useModal(detalleModalEl, () => {
+  detalleActual.value   = null
+  cargandoDetalle.value = false
 })
 
 async function verDetalle(t) {
   detalleActual.value = t
-  bsDetalleModal?.show()
-  // Cargar datos completos (incl. Tipo derivado) via GET /transferencias/:id
+  detalleModal.show()
   cargandoDetalle.value = true
   try {
     detalleActual.value = await api.dame(t.IdTransferencia)
@@ -125,22 +94,14 @@ async function verDetalle(t) {
 const crearModalEl = ref(null)
 const nuevaTransf  = ref({ id: '', idUsuarioFinal: '', idMoneda: '', tipo: 'I', monto: '', idCategoria: '', fecha: hoy() })
 const creando      = ref(false)
-let bsCrearModal   = null
 
-onMounted(() => {
-  bsCrearModal = new Modal(crearModalEl.value)
-  crearModalEl.value.addEventListener('hidden.bs.modal', () => {
-    nuevaTransf.value = { id: '', idUsuarioFinal: '', idMoneda: '', tipo: 'I', monto: '', idCategoria: '', fecha: hoy() }
-    creando.value = false
-  })
-})
-
-onBeforeUnmount(() => {
-  bsCrearModal?.dispose()
+const crearModal = useModal(crearModalEl, () => {
+  nuevaTransf.value = { id: '', idUsuarioFinal: '', idMoneda: '', tipo: 'I', monto: '', idCategoria: '', fecha: hoy() }
+  creando.value = false
 })
 
 function abrirModalCrear() {
-  bsCrearModal?.show()
+  crearModal.show()
 }
 
 async function crearTransferencia() {
@@ -159,43 +120,35 @@ async function crearTransferencia() {
     }
     if (monto) body.Monto = parseFloat(monto)
     const res = await api.crear(body)
-    bsCrearModal?.hide()
+    crearModal.hide()
     mostrarAlerta('success', `Transferencia encolada — ID: ${res.Id}`)
   } catch (e) {
     mostrarAlerta('danger', e.response?.data?.error ?? 'Error al crear transferencia')
-    bsCrearModal?.hide()
+    crearModal.hide()
   } finally {
     creando.value = false
   }
 }
 
 // Modal p revertir
-const revertirModalEl  = ref(null)
+const revertirModalEl        = ref(null)
 const transferenciaARevertir = ref(null)
-const fechaReversion   = ref('')
-const revirtiendo      = ref(false)
-let bsRevertirModal    = null
+const fechaReversion         = ref('')
+const revirtiendo            = ref(false)
 
-onMounted(() => {
-  bsRevertirModal = new Modal(revertirModalEl.value)
-  revertirModalEl.value.addEventListener('hidden.bs.modal', () => {
-    transferenciaARevertir.value = null
-    fechaReversion.value = ''
-    revirtiendo.value = false
-  })
-})
-
-onBeforeUnmount(() => {
-  bsRevertirModal?.dispose()
+const revertirModal = useModal(revertirModalEl, () => {
+  transferenciaARevertir.value = null
+  fechaReversion.value = ''
+  revirtiendo.value = false
 })
 
 function abrirReversion(t) {
   transferenciaARevertir.value = t
   fechaReversion.value = new Date().toISOString().slice(0, 10)
-  bsDetalleModal?.hide()
+  detalleModal.hide()
   // esperar a que cierre el detalle antes de abrir
   detalleModalEl.value.addEventListener('hidden.bs.modal', () => {
-    bsRevertirModal?.show()
+    revertirModal.show()
   }, { once: true })
 }
 
@@ -213,34 +166,16 @@ async function realizarReversion() {
       Fecha:           fechaReversion.value,
       Monto:           0
     })
-    bsRevertirModal?.hide()
+    revertirModal.hide()
     mostrarAlerta('success', `Reversión encolada — ID: ${res.Id}`)
     buscar()
   } catch (e) {
     mostrarAlerta('danger', e.response?.data?.error ?? 'Error al revertir transferencia')
-    bsRevertirModal?.hide()
+    revertirModal.hide()
   } finally {
     revirtiendo.value = false
   }
 }
-
-// Helpers
-function formatFecha(f) {
-  return f ? f.slice(0, 10) : '—'
-}
-
-function formatTimestamp(f) {
-  return f ? f.slice(0, 19).replace('T', ' ') : '—'
-}
-
-const _fmt = new Intl.NumberFormat('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-function formatMonto(v) { return _fmt.format(parseFloat(v) || 0) }
-
-const TIPO_LABEL = { I: 'Ingreso', E: 'Egreso', R: 'Reversión' }
-const TIPO_CLASS = { I: 'tipo-ingreso', E: 'tipo-egreso', R: 'tipo-reversion' }
-
-const ESTADO_LABEL = { F: 'Finalizada', R: 'Revertida' }
-const ESTADO_CLASS = { F: 'badge-activo', R: 'badge-pendiente' }
 </script>
 
 <template>
@@ -384,19 +319,7 @@ const ESTADO_CLASS = { F: 'badge-activo', R: 'badge-pendiente' }
               </tr>
             </tbody>
           </table>
-          <nav v-if="totalPaginas > 1" class="d-flex justify-content-center py-3">
-            <ul class="pagination pagination-sm mb-0">
-              <li class="page-item" :class="{ disabled: paginaActual === 1 }">
-                <button class="page-link" @click="paginaActual--">&lsaquo;</button>
-              </li>
-              <li v-for="p in paginasBotones" :key="p + '-' + Math.random()" class="page-item" :class="{ active: p === paginaActual, disabled: p === '...' }">
-                <button class="page-link" @click="typeof p === 'number' && (paginaActual = p)">{{ p }}</button>
-              </li>
-              <li class="page-item" :class="{ disabled: paginaActual === totalPaginas }">
-                <button class="page-link" @click="paginaActual++">&rsaquo;</button>
-              </li>
-            </ul>
-          </nav>
+          <Paginacion v-model="paginaActual" :total-paginas="totalPaginas" :botones="paginasBotones" />
         </div>
 
       </div>
@@ -618,47 +541,12 @@ const ESTADO_CLASS = { F: 'badge-activo', R: 'badge-pendiente' }
   padding-bottom: 0.75rem;
 }
 
-.total-row {
-  font-family: var(--font-mono);
-  font-size: 0.6875rem;
-  color: var(--text-tertiary);
-  padding: 0.5rem 0.75rem;
-  border-bottom: 1px solid var(--border);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-}
-
-.limite-aviso {
-  font-family: var(--font-mono);
-  font-size: 0.6875rem;
-  color: #92400E;
-  background: #FEF3C7;
-  padding: 0.2em 0.6em;
-  border-radius: 4px;
-  text-transform: none;
-  letter-spacing: 0;
-}
-
 .filtros-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
   gap: 0.75rem;
   align-items: end;
 }
-
-.tipo-badge {
-  font-family: var(--font-mono);
-  font-size: 0.6875rem;
-  font-weight: 600;
-  padding: 0.2em 0.6em;
-  border-radius: 4px;
-  letter-spacing: 0.02em;
-  white-space: nowrap;
-}
-
-.tipo-ingreso  { background: #D1FAE5; color: #065F46; }
-.tipo-egreso   { background: #FEE2E2; color: #991B1B; }
-.tipo-reversion { background: #E0F2FE; color: #0C4A6E; }
 
 .modal-id {
   font-family: var(--font-mono);

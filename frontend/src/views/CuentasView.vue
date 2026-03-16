@@ -1,7 +1,17 @@
 <script setup>
-import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
-import { Modal } from 'bootstrap'
+import { ref, onMounted } from 'vue'
 import ConfirmModal from '../components/ConfirmModal.vue'
+import { useAlert } from '../composables/useAlert'
+import { useModal } from '../composables/useModal'
+import { useConfirmModal } from '../composables/useConfirmModal'
+import { usePagination } from '../composables/usePagination'
+import Paginacion from '../components/Paginacion.vue'
+import {
+  formatFecha, formatTimestamp, formatMonto, hoy,
+  TIPO_LABEL, TIPO_CLASS,
+  ESTADO_CUENTA_LABEL as ESTADO_LABEL, ESTADO_CUENTA_CLASS as ESTADO_CLASS,
+  ESTADO_TRANS_LABEL as TTRANS_ESTADO_LABEL, ESTADO_TRANS_CLASS as TTRANS_ESTADO_CLASS
+} from '../utils/formatters'
 import * as api from '../api/cuentas'
 import { dame as dameParametro } from '../api/parametros'
 
@@ -10,37 +20,12 @@ const cargando = ref(false)
 const total    = ref(0)
 const filtros  = ref({ idUsuarioFinal: '', idMoneda: '', estado: '' })
 
-const limiteCuentas       = ref(100)
-const paginaCuentas       = ref(1)
-const limiteDetalle       = ref(100)
-const paginaTransfs       = ref(1)
-const paginaHistorial     = ref(1)
-const POR_PAGINA          = 50
+const limiteCuentas = ref(100)
+const limiteDetalle = ref(100)
 
-function paginasBotones(paginaActual, totalPaginas) {
-  const tot = totalPaginas
-  const act = paginaActual
-  if (tot <= 7) return Array.from({ length: tot }, (_, i) => i + 1)
-  const pags = [1]
-  if (act > 3) pags.push('...')
-  for (let p = Math.max(2, act - 1); p <= Math.min(tot - 1, act + 1); p++) pags.push(p)
-  if (act < tot - 2) pags.push('...')
-  pags.push(tot)
-  return pags
-}
+const { paginaActual: paginaCuentas, totalPaginas: totalPaginasCuentas, itemsEnPagina: cuentasEnPagina, botones: botonesCuentas } = usePagination(cuentas)
 
-const totalPaginasCuentas = computed(() => Math.max(1, Math.ceil(cuentas.value.length / POR_PAGINA)))
-const cuentasEnPagina     = computed(() => cuentas.value.slice((paginaCuentas.value - 1) * POR_PAGINA, paginaCuentas.value * POR_PAGINA))
-const botonesCuentas      = computed(() => paginasBotones(paginaCuentas.value, totalPaginasCuentas.value))
-
-const alerta = ref(null)
-let alertaTimer = null
-
-function mostrarAlerta(tipo, mensaje) {
-  clearTimeout(alertaTimer)
-  alerta.value = { tipo, mensaje }
-  alertaTimer = setTimeout(() => { alerta.value = null }, 4000)
-}
+const { alerta, mostrarAlerta } = useAlert()
 
 async function buscar() {
   cargando.value = true
@@ -78,22 +63,14 @@ onMounted(async () => {
 const crearModalEl = ref(null)
 const nuevaCuenta  = ref({ idUsuarioFinal: '', idMoneda: '', fecha: hoy() })
 const creando      = ref(false)
-let bsCrearModal   = null
 
-onMounted(() => {
-  bsCrearModal = new Modal(crearModalEl.value)
-  crearModalEl.value.addEventListener('hidden.bs.modal', () => {
-    nuevaCuenta.value = { idUsuarioFinal: '', idMoneda: '', fecha: hoy() }
-    creando.value = false
-  })
-})
-
-onBeforeUnmount(() => {
-  bsCrearModal?.dispose()
+const crearModal = useModal(crearModalEl, () => {
+  nuevaCuenta.value = { idUsuarioFinal: '', idMoneda: '', fecha: hoy() }
+  creando.value = false
 })
 
 function abrirModalCrear() {
-  bsCrearModal?.show()
+  crearModal.show()
 }
 
 async function crearCuenta() {
@@ -106,39 +83,19 @@ async function crearCuenta() {
       IdMoneda:       parseInt(idMoneda),
       Fecha:          fecha
     })
-    bsCrearModal?.hide()
+    crearModal.hide()
     mostrarAlerta('success', res.Mensaje ?? 'Cuenta creada')
     buscar()
   } catch (e) {
     mostrarAlerta('danger', e.response?.data?.error ?? 'Error al crear cuenta')
-    bsCrearModal?.hide()
+    crearModal.hide()
   } finally {
     creando.value = false
   }
 }
 
-//Modal p confirmar
-const confirmModalRef = ref(null)
-const confirmConfig   = ref({ title: '', message: '', confirmLabel: '', confirmVariant: 'btn-outline-danger' })
-let accionPendiente   = null
-
-function pedirConfirmacion(config, accion) {
-  confirmConfig.value = config
-  accionPendiente = accion
-  confirmModalRef.value.open()
-}
-
-async function onConfirmar() {
-  confirmModalRef.value.close()
-  if (accionPendiente) {
-    await accionPendiente()
-    accionPendiente = null
-  }
-}
-
-function onCancelar() {
-  accionPendiente = null
-}
+// Modal p confirmar
+const { confirmModalRef, confirmConfig, pedirConfirmacion, onConfirmar, onCancelar } = useConfirmModal()
 
 function activar(c) {
   pedirConfirmacion(
@@ -180,14 +137,11 @@ function desactivar(c) {
   )
 }
 
-const _fmt = new Intl.NumberFormat('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-function formatMonto(v) { return _fmt.format(parseFloat(v) || 0) }
-
 function balance(c) {
   const cr = parseFloat(c.Creditos) || 0
   const db = parseFloat(c.Debitos)  || 0
   const b  = cr - db
-  return (b > 0 ? '+' : '') + _fmt.format(b)
+  return (b > 0 ? '+' : '') + formatMonto(b)
 }
 
 function balanceClass(c) {
@@ -195,18 +149,7 @@ function balanceClass(c) {
   return b > 0 ? 'balance-positivo' : b < 0 ? 'balance-negativo' : ''
 }
 
-function hoy() {
-  return new Date().toISOString().slice(0, 10)
-}
-
-function formatFecha(f) {
-  return f ? f.slice(0, 10) : '—'
-}
-
-const ESTADO_LABEL = { A: 'Activa', I: 'Inactiva' }
-const ESTADO_CLASS = { A: 'badge-activo', I: 'badge-inactivo' }
-
-//  Detalle de cuenta 
+//  Detalle de cuenta
 const cuentaSeleccionada = ref(null)
 const tabActiva          = ref('transferencias')
 
@@ -234,9 +177,7 @@ const detalleTransfsTotal = ref(0)
 const cargandoTransfs     = ref(false)
 const filtrosTransfs      = ref({ timestampMin: '', timestampMax: '', incluyeRevertidas: false })
 
-const totalPaginasTransfs = computed(() => Math.max(1, Math.ceil(detalleTransfs.value.length / POR_PAGINA)))
-const transfsEnPagina     = computed(() => detalleTransfs.value.slice((paginaTransfs.value - 1) * POR_PAGINA, paginaTransfs.value * POR_PAGINA))
-const botonesTransfs      = computed(() => paginasBotones(paginaTransfs.value, totalPaginasTransfs.value))
+const { paginaActual: paginaTransfs, totalPaginas: totalPaginasTransfs, itemsEnPagina: transfsEnPagina, botones: botonesTransfs } = usePagination(detalleTransfs)
 
 async function cargarTransfs() {
   if (!cuentaSeleccionada.value) return
@@ -263,9 +204,7 @@ const historialTotal    = ref(0)
 const cargandoHistorial = ref(false)
 const filtrosHistorial  = ref({ timestampMin: '', timestampMax: '' })
 
-const totalPaginasHistorial = computed(() => Math.max(1, Math.ceil(historial.value.length / POR_PAGINA)))
-const historialEnPagina     = computed(() => historial.value.slice((paginaHistorial.value - 1) * POR_PAGINA, paginaHistorial.value * POR_PAGINA))
-const botonesHistorial      = computed(() => paginasBotones(paginaHistorial.value, totalPaginasHistorial.value))
+const { paginaActual: paginaHistorial, totalPaginas: totalPaginasHistorial, itemsEnPagina: historialEnPagina, botones: botonesHistorial } = usePagination(historial)
 
 async function cargarHistorial() {
   if (!cuentaSeleccionada.value) return
@@ -291,18 +230,6 @@ function cambiarTab(tab) {
   if (tab === 'transferencias' && detalleTransfs.value.length === 0) cargarTransfs()
   if (tab === 'historial'      && historial.value.length === 0)      cargarHistorial()
 }
-
-// Helpers detalle
-function formatTimestamp(ts) {
-  // Para strings ISO (FechaProceso)
-  return ts ? String(ts).slice(0, 19).replace('T', ' ') : '—'
-}
-
-
-const TIPO_LABEL = { I: 'Ingreso', E: 'Egreso', R: 'Reversión' }
-const TIPO_CLASS  = { I: 'tipo-ingreso', E: 'tipo-egreso', R: 'tipo-reversion' }
-const TTRANS_ESTADO_LABEL = { F: 'Finalizada', R: 'Revertida' }
-const TTRANS_ESTADO_CLASS = { F: 'badge-activo', R: 'badge-pendiente' }
 </script>
 
 <template>
@@ -455,19 +382,7 @@ const TTRANS_ESTADO_CLASS = { F: 'badge-activo', R: 'badge-pendiente' }
               </tr>
             </tbody>
           </table>
-          <nav v-if="totalPaginasCuentas > 1" class="d-flex justify-content-center py-3">
-            <ul class="pagination pagination-sm mb-0">
-              <li class="page-item" :class="{ disabled: paginaCuentas === 1 }">
-                <button class="page-link" @click="paginaCuentas--">&lsaquo;</button>
-              </li>
-              <li v-for="p in botonesCuentas" :key="String(p)" class="page-item" :class="{ active: p === paginaCuentas, disabled: p === '...' }">
-                <button class="page-link" @click="typeof p === 'number' && (paginaCuentas = p)">{{ p }}</button>
-              </li>
-              <li class="page-item" :class="{ disabled: paginaCuentas === totalPaginasCuentas }">
-                <button class="page-link" @click="paginaCuentas++">&rsaquo;</button>
-              </li>
-            </ul>
-          </nav>
+          <Paginacion v-model="paginaCuentas" :total-paginas="totalPaginasCuentas" :botones="botonesCuentas" />
         </div>
 
       </div>
@@ -701,19 +616,7 @@ const TTRANS_ESTADO_CLASS = { F: 'badge-activo', R: 'badge-pendiente' }
                 </tr>
               </tbody>
             </table>
-            <nav v-if="totalPaginasTransfs > 1" class="d-flex justify-content-center py-3">
-              <ul class="pagination pagination-sm mb-0">
-                <li class="page-item" :class="{ disabled: paginaTransfs === 1 }">
-                  <button class="page-link" @click="paginaTransfs--">&lsaquo;</button>
-                </li>
-                <li v-for="p in botonesTransfs" :key="String(p)" class="page-item" :class="{ active: p === paginaTransfs, disabled: p === '...' }">
-                  <button class="page-link" @click="typeof p === 'number' && (paginaTransfs = p)">{{ p }}</button>
-                </li>
-                <li class="page-item" :class="{ disabled: paginaTransfs === totalPaginasTransfs }">
-                  <button class="page-link" @click="paginaTransfs++">&rsaquo;</button>
-                </li>
-              </ul>
-            </nav>
+            <Paginacion v-model="paginaTransfs" :total-paginas="totalPaginasTransfs" :botones="botonesTransfs" />
           </div>
         </div>
       </div>
@@ -773,19 +676,7 @@ const TTRANS_ESTADO_CLASS = { F: 'badge-activo', R: 'badge-pendiente' }
                 </tr>
               </tbody>
             </table>
-            <nav v-if="totalPaginasHistorial > 1" class="d-flex justify-content-center py-3">
-              <ul class="pagination pagination-sm mb-0">
-                <li class="page-item" :class="{ disabled: paginaHistorial === 1 }">
-                  <button class="page-link" @click="paginaHistorial--">&lsaquo;</button>
-                </li>
-                <li v-for="p in botonesHistorial" :key="String(p)" class="page-item" :class="{ active: p === paginaHistorial, disabled: p === '...' }">
-                  <button class="page-link" @click="typeof p === 'number' && (paginaHistorial = p)">{{ p }}</button>
-                </li>
-                <li class="page-item" :class="{ disabled: paginaHistorial === totalPaginasHistorial }">
-                  <button class="page-link" @click="paginaHistorial++">&rsaquo;</button>
-                </li>
-              </ul>
-            </nav>
+            <Paginacion v-model="paginaHistorial" :total-paginas="totalPaginasHistorial" :botones="botonesHistorial" />
           </div>
         </div>
       </div>
@@ -796,38 +687,9 @@ const TTRANS_ESTADO_CLASS = { F: 'badge-activo', R: 'badge-pendiente' }
 </template>
 
 <style scoped>
-.btn-icon {
-  padding: 0.5rem 0.625rem;
-  line-height: 1;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-}
-
 :deep(tbody td) {
   padding-top: 0.875rem;
   padding-bottom: 0.875rem;
-}
-
-.total-row {
-  font-family: var(--font-mono);
-  font-size: 0.6875rem;
-  color: var(--text-tertiary);
-  padding: 0.5rem 0.75rem;
-  border-bottom: 1px solid var(--border);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-}
-
-.limite-aviso {
-  font-family: var(--font-mono);
-  font-size: 0.6875rem;
-  color: #92400E;
-  background: #FEF3C7;
-  padding: 0.2em 0.6em;
-  border-radius: 4px;
-  text-transform: none;
-  letter-spacing: 0;
 }
 
 .badge-empresa {
@@ -875,18 +737,4 @@ const TTRANS_ESTADO_CLASS = { F: 'badge-activo', R: 'badge-pendiente' }
 .info-value.mono {
   font-family: var(--font-mono);
 }
-
-.tipo-badge {
-  font-family: var(--font-mono);
-  font-size: 0.6875rem;
-  font-weight: 600;
-  padding: 0.2em 0.6em;
-  border-radius: 4px;
-  letter-spacing: 0.02em;
-  white-space: nowrap;
-}
-
-.tipo-ingreso   { background: #D1FAE5; color: #065F46; }
-.tipo-egreso    { background: #FEE2E2; color: #991B1B; }
-.tipo-reversion { background: #E0F2FE; color: #0C4A6E; }
 </style>

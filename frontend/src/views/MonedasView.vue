@@ -1,21 +1,17 @@
 <script setup>
-import { ref, onMounted, onBeforeUnmount } from 'vue'
-import { Modal } from 'bootstrap'
+import { ref, onMounted } from 'vue'
 import ConfirmModal from '../components/ConfirmModal.vue'
+import { useAlert } from '../composables/useAlert'
+import { useModal } from '../composables/useModal'
+import { useConfirmModal } from '../composables/useConfirmModal'
+import { formatTimestamp as formatFecha, ESTADO_MONEDA_LABEL as ESTADO_LABEL, ESTADO_MONEDA_CLASS as ESTADO_CLASS } from '../utils/formatters'
 import * as api from '../api/monedas'
 
 const monedas = ref([])
 const cargando = ref(false)
 const filtros  = ref({ incluyeInactivos: false })
 
-const alerta = ref(null)
-let alertaTimer = null
-
-function mostrarAlerta(tipo, mensaje) {
-  clearTimeout(alertaTimer)
-  alerta.value = { tipo, mensaje }
-  alertaTimer = setTimeout(() => { alerta.value = null }, 4000)
-}
+const { alerta, mostrarAlerta } = useAlert()
 
 async function listar() {
   cargando.value = true
@@ -34,22 +30,14 @@ onMounted(listar)
 const crearModalEl  = ref(null)
 const nuevoIdMoneda = ref('')
 const creando       = ref(false)
-let bsCrearModal    = null
 
-onMounted(() => {
-  bsCrearModal = new Modal(crearModalEl.value)
-  crearModalEl.value.addEventListener('hidden.bs.modal', () => {
-    nuevoIdMoneda.value = ''
-    creando.value = false
-  })
-})
-
-onBeforeUnmount(() => {
-  bsCrearModal?.dispose()
+const crearModal = useModal(crearModalEl, () => {
+  nuevoIdMoneda.value = ''
+  creando.value = false
 })
 
 function abrirModalCrear() {
-  bsCrearModal?.show()
+  crearModal.show()
 }
 
 async function crearMoneda() {
@@ -58,39 +46,19 @@ async function crearMoneda() {
   creando.value = true
   try {
     await api.crear(id)
-    bsCrearModal?.hide()
+    crearModal.hide()
     mostrarAlerta('success', `Moneda ${id} creada correctamente`)
     listar()
   } catch (e) {
     mostrarAlerta('danger', e.response?.data?.error ?? 'Error al crear moneda')
-    bsCrearModal?.hide()
+    crearModal.hide()
   } finally {
     creando.value = false
   }
 }
 
-//Modal p confirmar acción
-const confirmModalRef = ref(null)
-const confirmConfig   = ref({ title: '', message: '', confirmLabel: '', confirmVariant: 'btn-outline-danger' })
-let accionPendiente   = null
-
-function pedirConfirmacion(config, accion) {
-  confirmConfig.value = config
-  accionPendiente = accion
-  confirmModalRef.value.open()
-}
-
-async function onConfirmar() {
-  confirmModalRef.value.close()
-  if (accionPendiente) {
-    await accionPendiente()
-    accionPendiente = null
-  }
-}
-
-function onCancelar() {
-  accionPendiente = null
-}
+// Modal p confirmar acción
+const { confirmModalRef, confirmConfig, pedirConfirmacion, onConfirmar, onCancelar } = useConfirmModal()
 
 function activar(m) {
   pedirConfirmacion(
@@ -151,14 +119,6 @@ function borrar(m) {
     }
   )
 }
-
-// Helpers
-function formatFecha(f) {
-  return f ? f.slice(0, 19).replace('T', ' ') : '—'
-}
-
-const ESTADO_LABEL = { A: 'Activa', I: 'Inactiva' }
-const ESTADO_CLASS = { A: 'badge-activo', I: 'badge-inactivo' }
 </script>
 
 <template>
@@ -336,14 +296,6 @@ const ESTADO_CLASS = { A: 'badge-activo', I: 'badge-inactivo' }
 </template>
 
 <style scoped>
-.btn-icon {
-  padding: 0.5rem 0.625rem;
-  line-height: 1;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-}
-
 :deep(tbody td) {
   padding-top: 0.875rem;
   padding-bottom: 0.875rem;

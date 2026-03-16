@@ -354,3 +354,49 @@ body {
   color: var(--text-secondary);
   font-size: 0.875rem;
 }
+
+/*  Botón icono — compartido por Cuentas, Usuarios, Monedas, Parámetros  */
+.btn-icon {
+  padding: 0.5rem 0.625rem;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/*  Badge de tipo de transferencia — compartido por Cuentas y Transferencias  */
+.tipo-badge {
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  padding: 0.2em 0.6em;
+  border-radius: 4px;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
+.tipo-ingreso   { background: #D1FAE5; color: #065F46; }
+.tipo-egreso    { background: #FEE2E2; color: #991B1B; }
+.tipo-reversion { background: #E0F2FE; color: #0C4A6E; }
+
+/*  Fila de totales y aviso de límite — compartido por Cuentas y Transferencias  */
+.total-row {
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  color: var(--text-tertiary);
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid var(--border);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.limite-aviso {
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  color: #92400E;
+  background: #FEF3C7;
+  padding: 0.2em 0.6em;
+  border-radius: 4px;
+  text-transform: none;
+  letter-spacing: 0;
+}

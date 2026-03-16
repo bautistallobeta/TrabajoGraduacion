@@ -1,17 +1,13 @@
 <script setup>
-import { ref, onMounted, onBeforeUnmount } from 'vue'
-import { Modal } from 'bootstrap'
+import { ref, onMounted } from 'vue'
 import ConfirmModal from '../components/ConfirmModal.vue'
+import { useAlert } from '../composables/useAlert'
+import { useModal } from '../composables/useModal'
+import { useConfirmModal } from '../composables/useConfirmModal'
+import { formatFecha, ESTADO_USUARIO_LABEL as ESTADO_LABEL, ESTADO_USUARIO_CLASS as ESTADO_CLASS } from '../utils/formatters'
 import * as api from '../api/usuarios'
 
-const alerta = ref(null)
-let alertaTimer = null
-
-function mostrarAlerta(tipo, mensaje) {
-  clearTimeout(alertaTimer)
-  alerta.value = { tipo, mensaje }
-  alertaTimer = setTimeout(() => { alerta.value = null }, 4000)
-}
+const { alerta, mostrarAlerta } = useAlert()
 
 const alertaPwd = ref(null)
 
@@ -40,23 +36,15 @@ const crearModalEl    = ref(null)
 const nuevoUsuario    = ref('')
 const creandoUsuario  = ref(false)
 const resultadoCreacion = ref(null)
-let bsCrearModal = null
 
-onMounted(() => {
-  bsCrearModal = new Modal(crearModalEl.value)
-  crearModalEl.value.addEventListener('hidden.bs.modal', () => {
-    nuevoUsuario.value = ''
-    creandoUsuario.value = false
-  })
-})
-
-onBeforeUnmount(() => {
-  bsCrearModal?.dispose()
+const crearModal = useModal(crearModalEl, () => {
+  nuevoUsuario.value   = ''
+  creandoUsuario.value = false
 })
 
 function abrirModalCrear() {
   resultadoCreacion.value = null
-  bsCrearModal?.show()
+  crearModal.show()
 }
 
 async function crearUsuario() {
@@ -66,38 +54,18 @@ async function crearUsuario() {
     const res = await api.crear(nuevoUsuario.value.trim())
     resultadoCreacion.value = { ...res, usuario: nuevoUsuario.value.trim() }
     buscar()
-    bsCrearModal?.hide()
+    crearModal.hide()
     mostrarAlerta('success', `Usuario "${res.Id} — ${nuevoUsuario.value.trim()}" creado. Contraseña temporal: ${res.PasswordTemporal}`)
   } catch (e) {
     mostrarAlerta('danger', e.response?.data?.error ?? 'Error al crear usuario')
-    bsCrearModal?.hide()
+    crearModal.hide()
   } finally {
     creandoUsuario.value = false
   }
 }
 
-//Modal p confirmar
-const confirmModalRef = ref(null)
-const confirmConfig   = ref({ title: '', message: '', confirmLabel: '', confirmVariant: 'btn-outline-danger' })
-let accionPendiente   = null
-
-function pedirConfirmacion(config, accion) {
-  confirmConfig.value = config
-  accionPendiente = accion
-  confirmModalRef.value.open()
-}
-
-async function onConfirmar() {
-  confirmModalRef.value.close()
-  if (accionPendiente) {
-    await accionPendiente()
-    accionPendiente = null
-  }
-}
-
-function onCancelar() {
-  accionPendiente = null
-}
+// Modal p confirmar
+const { confirmModalRef, confirmConfig, pedirConfirmacion, onConfirmar, onCancelar } = useConfirmModal()
 
 function activar(u) {
   pedirConfirmacion(
@@ -168,13 +136,6 @@ async function restablecerPassword(u) {
     mostrarAlerta('danger', e.response?.data?.error ?? 'Error al restablecer contraseña')
   }
 }
-
-function formatFecha(f) {
-  return f ? f.slice(0, 10) : '—'
-}
-
-const ESTADO_LABEL = { A: 'Activo', I: 'Inactivo', P: 'Pendiente' }
-const ESTADO_CLASS = { A: 'badge-activo', I: 'badge-inactivo', P: 'badge-pendiente' }
 </script>
 
 <template>
@@ -389,14 +350,6 @@ const ESTADO_CLASS = { A: 'badge-activo', I: 'badge-inactivo', P: 'badge-pendien
 </template>
 
 <style scoped>
-.btn-icon {
-  padding: 0.5rem 0.625rem;
-  line-height: 1;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-}
-
 :deep(tbody td) {
   padding-top: 0.875rem;
   padding-bottom: 0.875rem;

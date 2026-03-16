@@ -1,20 +1,14 @@
 <script setup>
-import { ref, onMounted, onBeforeUnmount } from 'vue'
-import { Modal } from 'bootstrap'
+import { ref, onMounted } from 'vue'
+import { useAlert } from '../composables/useAlert'
+import { useModal } from '../composables/useModal'
 import * as api from '../api/parametros'
 
 const parametros = ref([])
 const cargando   = ref(false)
 const filtros    = ref({ cadena: '' })
 
-const alerta = ref(null)
-let alertaTimer = null
-
-function mostrarAlerta(tipo, mensaje) {
-  clearTimeout(alertaTimer)
-  alerta.value = { tipo, mensaje }
-  alertaTimer = setTimeout(() => { alerta.value = null }, 4000)
-}
+const { alerta, mostrarAlerta } = useAlert()
 
 async function buscar() {
   cargando.value = true
@@ -30,29 +24,21 @@ async function buscar() {
 onMounted(buscar)
 
 // modal editar
-const editModalEl  = ref(null)
-const editando     = ref(null)
-const nuevoValor   = ref('')
-const guardando    = ref(false)
-let bsEditModal    = null
+const editModalEl = ref(null)
+const editando    = ref(null)
+const nuevoValor  = ref('')
+const guardando   = ref(false)
 
-onMounted(() => {
-  bsEditModal = new Modal(editModalEl.value)
-  editModalEl.value.addEventListener('hidden.bs.modal', () => {
-    editando.value = null
-    nuevoValor.value = ''
-    guardando.value = false
-  })
-})
-
-onBeforeUnmount(() => {
-  bsEditModal?.dispose()
+const editModal = useModal(editModalEl, () => {
+  editando.value   = null
+  nuevoValor.value = ''
+  guardando.value  = false
 })
 
 function abrirEditar(p) {
-  editando.value = p
+  editando.value   = p
   nuevoValor.value = p.Valor
-  bsEditModal?.show()
+  editModal.show()
 }
 
 async function guardar() {
@@ -60,12 +46,12 @@ async function guardar() {
   guardando.value = true
   try {
     await api.modificar(editando.value.Parametro, nuevoValor.value)
-    bsEditModal?.hide()
+    editModal.hide()
     mostrarAlerta('success', `Parámetro "${editando.value.Parametro}" actualizado`)
     buscar()
   } catch (e) {
     mostrarAlerta('danger', e.response?.data?.error ?? 'Error al modificar parámetro')
-    bsEditModal?.hide()
+    editModal.hide()
   } finally {
     guardando.value = false
   }
@@ -208,14 +194,6 @@ async function guardar() {
 </template>
 
 <style scoped>
-.btn-icon {
-  padding: 0.5rem 0.625rem;
-  line-height: 1;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-}
-
 :deep(tbody td) {
   padding-top: 0.875rem;
   padding-bottom: 0.875rem;
