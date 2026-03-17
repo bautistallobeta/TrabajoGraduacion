@@ -160,6 +160,39 @@ func (gt *GestorTransferencias) convertirYFiltrar(tbTransfers []types.Transfer, 
 		}
 	}
 
+	// Derivar Tipo (I/E) para transfers normales comparando contra la cuenta empresa de cada moneda
+	monedaEmpresaCache := make(map[uint32]types.Uint128)
+	monedaVisitada := make(map[uint32]bool)
+	for i := range resultados {
+		if resultados[i].Tipo != "" {
+			continue
+		}
+		ledger := resultados[i].IdMoneda
+		if !monedaVisitada[ledger] {
+			monedaVisitada[ledger] = true
+			moneda := &models.Monedas{IdMoneda: int(ledger)}
+			if _, err := moneda.Dame(); err == nil && moneda.IdCuentaEmpresa != "" {
+				if parsed, errP := utils.ParsearUint128(moneda.IdCuentaEmpresa); errP == nil {
+					monedaEmpresaCache[ledger] = parsed
+				}
+			}
+		}
+		idCuentaEmpresa, ok := monedaEmpresaCache[ledger]
+		if !ok {
+			continue
+		}
+		debitID, errD := utils.ParsearUint128(resultados[i].IdCuentaDebito)
+		creditID, errC := utils.ParsearUint128(resultados[i].IdCuentaCredito)
+		if errD != nil || errC != nil {
+			continue
+		}
+		if debitID == idCuentaEmpresa {
+			resultados[i].Tipo = "I"
+		} else if creditID == idCuentaEmpresa {
+			resultados[i].Tipo = "E"
+		}
+	}
+
 	if !IncluyeRevertidas {
 		filtradas := make([]models.Transferencias, 0, len(resultados))
 		for _, tr := range resultados {
