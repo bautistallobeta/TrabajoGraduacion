@@ -86,7 +86,7 @@ body {
 
 .page-title {
   font-family: var(--font-mono);
-  font-size: 1.25rem;
+  font-size: 1.5rem;
   font-weight: 600;
   color: var(--text-primary);
   margin-bottom: 0;
@@ -180,7 +180,7 @@ body {
 /*  Overrides Bootstrap — Formularios  */
 .form-label {
   font-family: var(--font-mono);
-  font-size: 0.6875rem;
+  font-size: 0.7125rem;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.05em;
@@ -253,7 +253,7 @@ body {
   font-size: 0.875rem;
 }
 .cell-monto {
-  font-family: var(--font-mono);
+  font-family: var(--font-sans);
   font-size: 0.875rem;
   text-align: right;
 }
@@ -367,7 +367,7 @@ body {
 /*  Badge de tipo de transferencia — compartido por Cuentas y Transferencias  */
 .tipo-badge {
   font-family: var(--font-mono);
-  font-size: 0.6875rem;
+  font-size: 0.75rem;
   font-weight: 600;
   padding: 0.2em 0.6em;
   border-radius: 4px;
@@ -375,8 +375,8 @@ body {
   white-space: nowrap;
 }
 
-.tipo-ingreso   { background: #D1FAE5; color: #065F46; }
-.tipo-egreso    { background: #FEE2E2; color: #991B1B; }
+.tipo-ingreso   { color: #065F46; }
+.tipo-egreso    { color: #991B1B; }
 .tipo-reversion { background: #E0F2FE; color: #0C4A6E; }
 
 /*  Fila de totales y aviso de límite — compartido por Cuentas y Transferencias  */

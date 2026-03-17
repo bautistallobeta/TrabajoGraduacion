@@ -259,7 +259,7 @@ async function cambiarPassword() {
   max-width: 1400px;
   margin: 0 auto;
   padding: 0 1.5rem;
-  height: 64px;
+  height: 72px;
   display: flex;
   align-items: center;
   gap: 2rem;
@@ -275,7 +275,7 @@ async function cambiarPassword() {
 
 .brand-name {
   font-family: var(--font-mono);
-  font-size: 1.25rem;
+  font-size: 1.5rem;
   font-weight: 700;
   color: var(--accent);
   letter-spacing: -0.03em;
@@ -283,7 +283,7 @@ async function cambiarPassword() {
 
 .brand-sub {
   font-family: var(--font-mono);
-  font-size: 0.625rem;
+  font-size: 0.75rem;
   font-weight: 500;
   color: var(--text-tertiary);
   text-transform: uppercase;

@@ -114,7 +114,6 @@ async function guardar() {
                 <th>Parámetro</th>
                 <th>Valor</th>
                 <th>Descripción</th>
-                <th>Modificable</th>
                 <th style="width: 1%; white-space: nowrap">Acciones</th>
               </tr>
             </thead>
@@ -123,10 +122,6 @@ async function guardar() {
                 <td class="cell-mono">{{ p.Parametro }}</td>
                 <td class="cell-mono" style="color: var(--accent)">{{ p.Valor }}</td>
                 <td style="color: var(--text-secondary); font-size: 0.8125rem">{{ p.Descripcion }}</td>
-                <td>
-                  <span v-if="p.EsModificable === 'S'" class="badge badge-activo">Sí</span>
-                  <span v-else class="badge badge-inactivo">No</span>
-                </td>
                 <td>
                   <button
                     v-if="p.EsModificable === 'S'"

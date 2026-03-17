@@ -15,7 +15,7 @@ import {
 import * as api from '../api/cuentas'
 import { dame as dameParametro } from '../api/parametros'
 
-const esDemo = import.meta.env.VITE_DEMO_MODE === 'true'
+const esDemo =  import.meta.env.VITE_DEMO_MODE === 'true'
 
 const cuentas  = ref([])
 const cargando = ref(false)
@@ -123,7 +123,7 @@ function desactivar(c) {
   pedirConfirmacion(
     {
       title: 'Desactivar cuenta',
-      message: `¿Desactivar la cuenta del usuario <strong>${c.IdUsuarioFinal}</strong> en moneda <strong>${c.IdMoneda}</strong>? Se requiere saldo cero.`,
+      message: `¿Desactivar la cuenta del usuario <strong>${c.IdUsuarioFinal}</strong> en moneda <strong>${c.IdMoneda}</strong>?`,
       confirmLabel: 'Desactivar',
       confirmVariant: 'btn-outline-danger'
     },
@@ -253,7 +253,7 @@ function cambiarTab(tab) {
         <div class="d-flex align-items-end justify-content-between gap-3 flex-wrap">
           <form @submit.prevent="buscar" class="d-flex align-items-end gap-3 flex-wrap">
             <div>
-              <label class="form-label">Usuario</label>
+              <label class="form-label">IdUsuario</label>
               <input
                 v-model="filtros.idUsuarioFinal"
                 type="number"
@@ -341,7 +341,7 @@ function cambiarTab(tab) {
                 <td class="cell-monto">{{ formatMonto(c.Debitos) }}</td>
                 <td :class="`cell-monto ${balanceClass(c)}`">{{ balance(c) }}</td>
                 <td>{{ formatFecha(c.Fecha) }}</td>
-                <td class="cell-id">{{ formatTimestamp(c.FechaProceso) }}</td>
+                <td>{{ formatTimestamp(c.FechaProceso) }}</td>
                 <td>
                   <span v-if="c.IdUsuarioFinal === 0" class="badge badge-empresa">Empresa</span>
                   <span v-else :class="`badge ${ESTADO_CLASS[c.Estado] ?? ''}`">
@@ -556,7 +556,7 @@ function cambiarTab(tab) {
                   type="checkbox"
                   class="form-check-input mt-0"
                 />
-                <label for="incluyeRevertidas" class="form-label mb-0" style="white-space: nowrap">Incl. revertidas</label>
+                <label for="incluyeRevertidas" class="form-label mb-0" style="white-space: nowrap; font-size: 0.6875rem">Incl. revertidas</label>
               </div>
             </div>
             <div>
@@ -583,7 +583,7 @@ function cambiarTab(tab) {
                 Se alcanzó el límite de búsqueda. Acotar los filtros para resultados más precisos.
               </span>
             </div>
-            <table class="table mb-0">
+            <table class="table mb-0" style="table-layout: fixed">
               <thead>
                 <tr>
                   <th>ID</th>
@@ -591,15 +591,13 @@ function cambiarTab(tab) {
                   <th>Categoría</th>
                   <th class="text-end">Monto</th>
                   <th>Estado</th>
-                  <th>Fecha</th>
+                  <th>Fecha Alta</th>
                   <th>Procesada</th>
                 </tr>
               </thead>
               <tbody>
                 <tr v-for="t in transfsEnPagina" :key="t.IdTransferencia">
-                  <td class="cell-mono" style="font-size: 0.75rem; max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap">
-                    {{ t.IdTransferencia }}
-                  </td>
+                  <td class="cell-id" style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap">{{ t.IdTransferencia }}</td>
                   <td>
                     <span v-if="t.Tipo" :class="`tipo-badge ${TIPO_CLASS[t.Tipo] ?? ''}`">
                       {{ TIPO_LABEL[t.Tipo] ?? t.Tipo }}
@@ -614,7 +612,7 @@ function cambiarTab(tab) {
                     </span>
                   </td>
                   <td>{{ formatFecha(t.Fecha) }}</td>
-                  <td style="font-size: 0.8rem; color: var(--text-secondary)">{{ formatTimestamp(t.FechaProceso) }}</td>
+                  <td>{{ formatTimestamp(t.FechaProceso) }}</td>
                 </tr>
               </tbody>
             </table>
@@ -658,7 +656,7 @@ function cambiarTab(tab) {
                 Se alcanzó el límite de búsqueda. Acotar los filtros para resultados más precisos.
               </span>
             </div>
-            <table class="table mb-0">
+            <table class="table mb-0" style="table-layout: fixed">
               <thead>
                 <tr>
                   <th>Fecha proceso</th>
@@ -669,9 +667,7 @@ function cambiarTab(tab) {
               </thead>
               <tbody>
                 <tr v-for="(h, i) in historialEnPagina" :key="i">
-                  <td style="font-family: var(--font-mono); font-size: 0.8rem; color: var(--text-secondary)">
-                    {{ formatTimestamp(h.Fecha) }}
-                  </td>
+                  <td>{{ formatTimestamp(h.Fecha) }}</td>
                   <td class="cell-monto" style="color: var(--success)">{{ formatMonto(h.Creditos) }}</td>
                   <td class="cell-monto" style="color: var(--error)">{{ formatMonto(h.Debitos) }}</td>
                   <td class="cell-monto" style="font-weight: 600">{{ formatMonto(h.Balance) }}</td>

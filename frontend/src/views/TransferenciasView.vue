@@ -205,7 +205,7 @@ async function realizarReversion() {
               <input v-model="filtros.idTransferencia" type="text" class="form-control" placeholder="ID exacto..." />
             </div>
             <div>
-              <label class="form-label">Usuario</label>
+              <label class="form-label">IdUsuario</label>
               <input v-model="filtros.idUsuarioFinal" type="number" min="1" class="form-control" placeholder="ID..." />
             </div>
             <div>
@@ -232,22 +232,20 @@ async function realizarReversion() {
               <label class="form-label">Hasta</label>
               <input v-model="filtros.fechaHasta" type="date" class="form-control" />
             </div>
-            <div style="padding-bottom: 6px" class="d-flex align-items-end">
-              <div class="d-flex align-items-center gap-2">
-                <input
-                  id="incluyeRevertidas"
-                  v-model="filtros.incluyeRevertidas"
-                  type="checkbox"
-                  class="form-check-input mt-0"
-                />
-                <label for="incluyeRevertidas" class="form-label mb-0" style="white-space: nowrap">Incl. revertidas</label>
-              </div>
+          </div>
+          <div class="filtros-footer">
+            <div class="d-flex align-items-center gap-2">
+              <input
+                id="incluyeRevertidas"
+                v-model="filtros.incluyeRevertidas"
+                type="checkbox"
+                class="form-check-input mt-0"
+              />
+              <label for="incluyeRevertidas" class="form-label mb-0" style="white-space: nowrap; font-size: 0.6875rem">Incl. revertidas</label>
             </div>
-            <div class="d-flex align-items-end">
-              <button type="submit" class="btn btn-outline-primary w-100" :disabled="cargando">
-                Buscar
-              </button>
-            </div>
+            <button type="submit" class="btn btn-outline-primary" :disabled="cargando">
+              Buscar
+            </button>
           </div>
         </form>
       </div>
@@ -280,7 +278,7 @@ async function realizarReversion() {
             <thead>
               <tr>
                 <th>ID</th>
-                <th>Usuario</th>
+                <th>IdUsuario</th>
                 <th>Moneda</th>
                 <th>Tipo</th>
                 <th>Categoría</th>
@@ -288,14 +286,12 @@ async function realizarReversion() {
                 <th>Fecha Alta</th>
                 <th>Procesada</th>
                 <th>Estado</th>
-                <th style="width: 1%; white-space: nowrap"></th>
+                <th style="width: 1%; white-space: nowrap">Acciones</th>
               </tr>
             </thead>
             <tbody>
-              <tr v-for="t in transferenciasEnPagina" :key="t.IdTransferencia" class="clickable" @click="verDetalle(t)">
-                <td class="cell-id" style="max-width: 140px; overflow: hidden; text-overflow: ellipsis">
-                  {{ t.IdTransferencia }}
-                </td>
+              <tr v-for="t in transferenciasEnPagina" :key="t.IdTransferencia">
+                <td class="cell-id">{{ t.IdTransferencia }}</td>
                 <td class="cell-id">{{ t.IdUsuarioFinal }}</td>
                 <td class="cell-id">{{ t.IdMoneda }}</td>
                 <td>
@@ -307,16 +303,22 @@ async function realizarReversion() {
                 <td class="cell-id">{{ t.Categoria }}</td>
                 <td class="cell-monto">{{ formatMonto(t.Monto) }}</td>
                 <td>{{ formatFecha(t.Fecha) }}</td>
-                <td class="cell-id">{{ formatTimestamp(t.FechaProceso) }}</td>
+                <td>{{ formatTimestamp(t.FechaProceso) }}</td>
                 <td>
                   <span :class="`badge ${ESTADO_CLASS[t.Estado] ?? ''}`">
                     {{ ESTADO_LABEL[t.Estado] ?? t.Estado }}
                   </span>
                 </td>
-                <td>
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--text-tertiary)">
-                    <polyline points="9 18 15 12 9 6"/>
-                  </svg>
+                <td style="white-space: nowrap">
+                  <button
+                    class="btn btn-outline-primary btn-icon"
+                    title="Ver detalle"
+                    @click="verDetalle(t)"
+                  >
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <circle cx="12" cy="12" r="10"/><line x1="12" y1="12" x2="12" y2="16"/><line x1="12" y1="8" x2="12.01" y2="8"/>
+                    </svg>
+                  </button>
                 </td>
               </tr>
             </tbody>
@@ -366,7 +368,7 @@ async function realizarReversion() {
                   />
                 </div>
                 <div>
-                  <label class="form-label">Usuario</label>
+                  <label class="form-label">IdUsuario</label>
                   <input v-model="nuevaTransf.idUsuarioFinal" type="number" min="1" class="form-control" placeholder="ID..." :disabled="creando" required />
                 </div>
                 <div>
@@ -397,67 +399,57 @@ async function realizarReversion() {
 
     <!-- Modal detalle -->
     <div ref="detalleModalEl" class="modal fade" tabindex="-1" aria-hidden="true">
-      <div class="modal-dialog modal-dialog-centered" style="max-width: 480px">
+      <div class="modal-dialog modal-dialog-centered" style="max-width: 500px">
         <div class="modal-content" v-if="detalleActual">
           <div class="modal-header">
             <div>
-              <h5 class="modal-title d-flex align-items-center gap-2">
+              <h5 class="modal-title det-title d-flex align-items-center gap-2">
                 Transferencia
                 <span v-if="cargandoDetalle" class="spinner-border spinner-border-sm text-secondary" role="status" aria-hidden="true"></span>
               </h5>
-              <div class="modal-id">{{ detalleActual.IdTransferencia }}</div>
+              <div class="det-id">(IdTransferencia: {{ detalleActual.IdTransferencia }})</div>
             </div>
             <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
           </div>
           <div class="modal-body">
-            <div class="detalle-grid">
-              <div class="detalle-item">
-                <span class="detalle-label">Tipo</span>
-                <span class="detalle-tipo" :class="TIPO_CLASS[detalleActual.Tipo]">
+            <div class="det-grid">
+              <div class="det-item">
+                <span class="det-label">Tipo</span>
+                <span class="det-val" :class="TIPO_CLASS[detalleActual.Tipo]">
                   {{ TIPO_LABEL[detalleActual.Tipo] ?? (detalleActual.Tipo || '—') }}
                 </span>
               </div>
-              <div class="detalle-item">
-                <span class="detalle-label">Estado</span>
-                <span :class="`badge ${ESTADO_CLASS[detalleActual.Estado] ?? ''}`">
-                  {{ ESTADO_LABEL[detalleActual.Estado] ?? detalleActual.Estado }}
-                </span>
+              <div class="det-item">
+                <span class="det-label">Monto</span>
+                <span class="det-val">{{ formatMonto(detalleActual.Monto) }}</span>
               </div>
-              <div class="detalle-item">
-                <span class="detalle-label">Monto</span>
-                <span class="detalle-monto">{{ formatMonto(detalleActual.Monto) }}</span>
+              <div class="det-item">
+                <span class="det-label">IdUsuario</span>
+                <span class="det-val">{{ detalleActual.IdUsuarioFinal }}</span>
               </div>
-              <div class="detalle-item">
-                <span class="detalle-label">Usuario</span>
-                <span class="detalle-value">{{ detalleActual.IdUsuarioFinal }}</span>
+              <div class="det-item">
+                <span class="det-label">Moneda</span>
+                <span class="det-val">{{ detalleActual.IdMoneda }}</span>
               </div>
-              <div class="detalle-item">
-                <span class="detalle-label">Moneda</span>
-                <span class="detalle-value">{{ detalleActual.IdMoneda }}</span>
+              <div class="det-item">
+                <span class="det-label">Fecha Alta</span>
+                <span class="det-val">{{ formatFecha(detalleActual.Fecha) }}</span>
               </div>
-              <div class="detalle-item">
-                <span class="detalle-label">Categoría</span>
-                <span class="detalle-value">{{ detalleActual.Categoria }}</span>
+              <div class="det-item">
+                <span class="det-label">Procesada</span>
+                <span class="det-val">{{ formatTimestamp(detalleActual.FechaProceso) }}</span>
               </div>
-              <div class="detalle-item">
-                <span class="detalle-label">Fecha negocio</span>
-                <span class="detalle-value">{{ formatFecha(detalleActual.Fecha) }}</span>
+              <div class="det-item">
+                <span class="det-label">Categoría</span>
+                <span class="det-val">{{ detalleActual.Categoria }}</span>
               </div>
-              <div class="detalle-item">
-                <span class="detalle-label">Procesada</span>
-                <span class="detalle-value" style="font-size: 0.8rem">{{ formatTimestamp(detalleActual.FechaProceso) }}</span>
+              <div class="det-item">
+                <span class="det-label">Estado</span>
+                <span class="det-val">{{ ESTADO_LABEL[detalleActual.Estado] ?? detalleActual.Estado }}</span>
               </div>
-              <div class="detalle-item detalle-full">
-                <span class="detalle-label">Cuenta débito</span>
-                <span class="detalle-value mono">{{ detalleActual.IdCuentaDebito }}</span>
-              </div>
-              <div class="detalle-item detalle-full">
-                <span class="detalle-label">Cuenta crédito</span>
-                <span class="detalle-value mono">{{ detalleActual.IdCuentaCredito }}</span>
-              </div>
-              <div v-if="detalleActual.IdTransferenciaOriginal" class="detalle-item detalle-full">
-                <span class="detalle-label">Transfer original</span>
-                <span class="detalle-value mono">{{ detalleActual.IdTransferenciaOriginal }}</span>
+              <div v-if="detalleActual.IdTransferenciaOriginal" class="det-item det-full">
+                <span class="det-label">Transfer. original</span>
+                <span class="det-val">{{ detalleActual.IdTransferenciaOriginal }}</span>
               </div>
             </div>
           </div>
@@ -489,26 +481,26 @@ async function realizarReversion() {
           </div>
           <form @submit.prevent="realizarReversion">
             <div class="modal-body">
-              <div class="detalle-grid mb-3">
-                <div class="detalle-item detalle-full">
-                  <span class="detalle-label">ID a revertir</span>
-                  <span class="detalle-value mono">{{ transferenciaARevertir.IdTransferencia }}</span>
+              <div class="det-grid mb-3">
+                <div class="det-item det-full">
+                  <span class="det-label">ID a revertir</span>
+                  <span class="det-val" style="word-break: break-all">{{ transferenciaARevertir.IdTransferencia }}</span>
                 </div>
-                <div class="detalle-item">
-                  <span class="detalle-label">Usuario</span>
-                  <span class="detalle-value">{{ transferenciaARevertir.IdUsuarioFinal }}</span>
+                <div class="det-item">
+                  <span class="det-label">Usuario</span>
+                  <span class="det-val">{{ transferenciaARevertir.IdUsuarioFinal }}</span>
                 </div>
-                <div class="detalle-item">
-                  <span class="detalle-label">Moneda</span>
-                  <span class="detalle-value">{{ transferenciaARevertir.IdMoneda }}</span>
+                <div class="det-item">
+                  <span class="det-label">Moneda</span>
+                  <span class="det-val">{{ transferenciaARevertir.IdMoneda }}</span>
                 </div>
-                <div class="detalle-item">
-                  <span class="detalle-label">Monto original</span>
-                  <span class="detalle-monto" style="font-size: 0.9375rem">{{ formatMonto(transferenciaARevertir.Monto) }}</span>
+                <div class="det-item">
+                  <span class="det-label">Monto original</span>
+                  <span class="det-val det-val-monto">{{ formatMonto(transferenciaARevertir.Monto) }}</span>
                 </div>
-                <div class="detalle-item">
-                  <span class="detalle-label">Categoría</span>
-                  <span class="detalle-value">{{ transferenciaARevertir.Categoria }}</span>
+                <div class="det-item">
+                  <span class="det-label">Categoría</span>
+                  <span class="det-val">{{ transferenciaARevertir.Categoria }}</span>
                 </div>
               </div>
               <div>
@@ -539,8 +531,8 @@ async function realizarReversion() {
 
 <style scoped>
 :deep(tbody td) {
-  padding-top: 0.75rem;
-  padding-bottom: 0.75rem;
+  padding-top: 0.875rem;
+  padding-bottom: 0.875rem;
 }
 
 .filtros-grid {
@@ -550,48 +542,11 @@ async function realizarReversion() {
   align-items: end;
 }
 
-.modal-id {
-  font-family: var(--font-mono);
-  font-size: 0.6875rem;
-  color: var(--text-tertiary);
-  margin-top: 0.125rem;
-  word-break: break-all;
-}
-
-.detalle-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 1rem 1.5rem;
-}
-
-.detalle-full {
-  grid-column: 1 / -1;
-}
-
-.detalle-item {
+.filtros-footer {
   display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-}
-
-.detalle-label {
-  font-family: var(--font-mono);
-  font-size: 0.625rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--text-tertiary);
-}
-
-.detalle-value {
-  font-size: 0.875rem;
-  color: var(--text-primary);
-}
-
-.detalle-value.mono {
-  font-family: var(--font-mono);
-  font-size: 0.75rem;
-  word-break: break-all;
+  align-items: center;
+  gap: 1rem;
+  margin-top: 0.75rem;
 }
 
 .crear-grid {
@@ -604,20 +559,51 @@ async function realizarReversion() {
   grid-column: 1 / -1;
 }
 
-.detalle-monto {
-  font-family: var(--font-mono);
-  font-size: 1.125rem;
-  font-weight: 600;
-  color: var(--accent);
+/* Modal detalle + reversión */
+.det-title {
+  font-size: 1.25rem !important;
 }
 
-.detalle-tipo {
-  font-size: 0.9375rem;
+.det-id {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  color: var(--text-tertiary);
+  margin-top: 0.25rem;
+  word-break: break-all;
+}
+
+.det-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.5rem 1.75rem;
+}
+
+.det-full {
+  grid-column: 1 / -1;
+}
+
+.det-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.det-label {
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
   font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-tertiary);
+}
+
+.det-val {
+  font-family: var(--font-sans);
+  font-size: 1rem;
   color: var(--text-primary);
 }
 
-.detalle-tipo.tipo-ingreso  { color: #065F46; }
-.detalle-tipo.tipo-egreso   { color: #991B1B; }
-.detalle-tipo.tipo-reversion { color: #0C4A6E; }
+.det-val.tipo-ingreso   { color: #065F46; }
+.det-val.tipo-egreso    { color: #991B1B; }
+.det-val.tipo-reversion { color: #0C4A6E; }
 </style>

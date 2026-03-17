@@ -14,6 +14,8 @@ export const ESTADO_CUENTA_CLASS   = { A: 'badge-activo', I: 'badge-inactivo' }
 export const ESTADO_USUARIO_LABEL  = { A: 'Activo',   I: 'Inactivo',  P: 'Pendiente' }
 export const ESTADO_USUARIO_CLASS  = { A: 'badge-activo', I: 'badge-inactivo', P: 'badge-pendiente' }
 
+export const ROL_USUARIO_LABEL = { A: 'Administrador', O: 'Operador' }
+
 export const ESTADO_MONEDA_LABEL   = { A: 'Activa',   I: 'Inactiva' }
 export const ESTADO_MONEDA_CLASS   = { A: 'badge-activo', I: 'badge-inactivo' }
 

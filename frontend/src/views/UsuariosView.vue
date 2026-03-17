@@ -4,7 +4,7 @@ import ConfirmModal from '../components/ConfirmModal.vue'
 import { useAlert } from '../composables/useAlert'
 import { useModal } from '../composables/useModal'
 import { useConfirmModal } from '../composables/useConfirmModal'
-import { formatFecha, ESTADO_USUARIO_LABEL as ESTADO_LABEL, ESTADO_USUARIO_CLASS as ESTADO_CLASS } from '../utils/formatters'
+import { formatFecha, ESTADO_USUARIO_LABEL as ESTADO_LABEL, ESTADO_USUARIO_CLASS as ESTADO_CLASS, ROL_USUARIO_LABEL } from '../utils/formatters'
 import * as api from '../api/usuarios'
 
 const { alerta, mostrarAlerta } = useAlert()
@@ -178,18 +178,16 @@ async function restablecerPassword(u) {
                   placeholder="Nombre de usuario..."
                 />
               </div>
-              <div style="padding-bottom: 2px">
-                <div class="d-flex align-items-center gap-2">
-                  <input
-                    id="incluyeInactivos"
-                    v-model="filtros.incluyeInactivos"
-                    type="checkbox"
-                    class="form-check-input mt-0"
-                  />
-                  <label for="incluyeInactivos" class="form-label mb-0">Incluir inactivos</label>
-                </div>
+              <div class="d-flex align-items-center gap-2" style="min-height: 2.375rem">
+                <input
+                  id="incluyeInactivos"
+                  v-model="filtros.incluyeInactivos"
+                  type="checkbox"
+                  class="form-check-input mt-0"
+                />
+                <label for="incluyeInactivos" class="form-label mb-0" style="font-size: 0.6875rem">Incluir inactivos</label>
               </div>
-              <div style="padding-bottom: 2px">
+              <div>
                 <button type="submit" class="btn btn-outline-primary" :disabled="cargando">
                   Buscar
                 </button>
@@ -226,6 +224,7 @@ async function restablecerPassword(u) {
                 <tr>
                   <th>ID</th>
                   <th>Usuario</th>
+                  <th>Rol</th>
                   <th>Estado</th>
                   <th>Fecha Alta</th>
                   <th style="width: 1%; white-space: nowrap">Acciones</th>
@@ -235,6 +234,7 @@ async function restablecerPassword(u) {
                 <tr v-for="u in usuarios" :key="u.IdUsuario">
                   <td class="cell-id">{{ u.IdUsuario }}</td>
                   <td class="cell-mono">{{ u.Usuario }}</td>
+                  <td>{{ ROL_USUARIO_LABEL[u.Rol] ?? '—' }}</td>
                   <td>
                     <span :class="`badge ${ESTADO_CLASS[u.Estado] ?? ''}`">
                       {{ ESTADO_LABEL[u.Estado] ?? u.Estado }}
@@ -242,7 +242,7 @@ async function restablecerPassword(u) {
                   </td>
                   <td>{{ formatFecha(u.FechaAlta) }}</td>
                   <td style="white-space: nowrap">
-                    <div class="d-flex gap-1">
+                    <div class="d-flex gap-1 justify-content-end">
                       <button
                         v-if="u.Estado === 'I'"
                         class="btn btn-outline-primary btn-icon"
@@ -264,6 +264,7 @@ async function restablecerPassword(u) {
                         </svg>
                       </button>
                       <button
+                        v-if="u.Estado !== 'P'"
                         class="btn btn-outline-secondary btn-icon"
                         title="Restablecer contraseña"
                         @click="restablecerPassword(u)"

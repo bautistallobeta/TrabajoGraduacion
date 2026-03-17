@@ -146,11 +146,11 @@ function borrar(m) {
                 type="checkbox"
                 class="form-check-input mt-0"
               />
-              <label for="incluyeInactivos" class="form-label mb-0">Incluir inactivas</label>
+              <label for="incluyeInactivos" class="form-label mb-0" style="font-size: 0.6875rem">Incluir inactivas</label>
             </div>
             <div>
               <button type="submit" class="btn btn-outline-primary" :disabled="cargando">
-                Actualizar
+                Listar
               </button>
             </div>
           </form>
