@@ -120,12 +120,12 @@ components:
           example: "2025-01-15 10:30:00.123456789"
         Estado:
           type: string
-          enum: [F, R]
-          description: F=Finalizada, R=Revertida
+          enum: [F, R, '']
+          description: "F=Finalizada, R=Revertida (fue revertida), vacío=transfer de reversión interna (sin estado propio)"
           example: "F"
         IdTransferenciaOriginal:
           type: string
-          description: Solo presente en reversiones
+          description: "Solo presente en transfers de reversión interna (Tipo=R). Contiene el ID de la transfer original que fue revertida."
           example: "98765432100000000001"
 
     Moneda:
@@ -212,6 +212,11 @@ paths:
     get:
       tags: [Transferencias]
       summary: Obtener transferencia por ID
+      description: |
+        Devuelve la transfer con todos sus datos. El campo `Estado` tiene la siguiente semántica:
+        - `F` — transfer finalizada normalmente
+        - `R` — transfer que **fue revertida** (tiene una reversión asociada)
+        - `""` (vacío) — la transfer consultada **es** una reversión interna; en este caso `IdTransferenciaOriginal` contiene el ID de la transfer que revirtió
       parameters:
         - name: idtransferencia
           in: path
@@ -248,6 +253,8 @@ paths:
         Si se envía `IdsTransferencia` (parámetro repetido), hace lookup directo ignorando el resto de filtros.
         De lo contrario aplica los filtros disponibles.
         `FechaDesde`/`FechaHasta` filtran por timestamp de procesamiento en TigerBeetle, no por fecha de negocio.
+        Las transferencias de reversión internas nunca aparecen en los resultados.
+        En la respuesta, `Estado=F` indica transfer finalizada y `Estado=R` indica transfer que fue revertida.
       parameters:
         - name: IdsTransferencia
           in: query
@@ -273,12 +280,12 @@ paths:
           schema:
             type: integer
           description: "0 o vacío = sin filtro"
-        - name: Estado
+        - name: IncluyeRevertidas
           in: query
           schema:
-            type: string
-            enum: [F, R, '']
-          description: "F=Finalizada, R=Revertida, vacío=sin filtro"
+            type: boolean
+            default: false
+          description: "false (default)=solo finalizadas; true=finalizadas y revertidas"
         - name: MontoMin
           in: query
           schema:
@@ -517,9 +524,10 @@ paths:
                         Balance:
                           type: string
                           example: "400.00"
-                        Timestamp:
-                          type: integer
-                          example: 1735689600123456789
+                        Fecha:
+                          type: string
+                          description: Fecha y hora del snapshot en hora Argentina (ART, UTC-3).
+                          example: "2026-01-01 03:00:00.123456789"
         '400':
           description: Parámetros inválidos
           content:
@@ -537,7 +545,12 @@ paths:
     get:
       tags: [Cuentas]
       summary: Transferencias de la cuenta
-      description: Devuelve las transferencias asociadas a la cuenta. Excluye las de cierre internas.
+      description: |
+        Devuelve las transferencias asociadas a la cuenta.
+        Las transferencias de reversión internas (Code=2) nunca aparecen en los resultados.
+        Las transfers de cierre internas (Code=3) tampoco aparecen.
+        En la respuesta, `Estado=F` indica transfer finalizada y `Estado=R` indica transfer que fue revertida.
+        `IncluyeRevertidas=false` (por defecto) excluye las transfers con `Estado=R`; `true` las incluye.
       parameters:
         - name: idusuariofinal
           in: path
@@ -567,6 +580,12 @@ paths:
             type: integer
             default: 0
           description: Máximo de registros. 0 = sin límite.
+        - name: IncluyeRevertidas
+          in: query
+          schema:
+            type: boolean
+            default: false
+          description: Si true devuelve transfers finalizadas y revertidas (Estado=F y Estado=R). Si false (por defecto) solo devuelve finalizadas.
       responses:
         '200':
           description: Transferencias de la cuenta
