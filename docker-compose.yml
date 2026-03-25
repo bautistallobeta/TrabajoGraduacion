@@ -101,16 +101,16 @@ services:
     ports:
       - "8080:8080"
     environment:
-      KAFKA_BROKERS: "kafka:9092"
+      KAFKA_BROKERS: ${KAFKA_BROKERS}
       KAFKA_TOPIC_TRANSFERS: ${KAFKA_TOPIC_TRANSFERS}
       KAFKA_GROUP_ID: ${KAFKA_GROUP_ID}
-      TB_ADDRESSES: "172.28.0.10:3000"
-      MYSQL_HOST: "mysql"
-      MYSQL_PORT: "3306"
+      TB_ADDRESSES: ${TB_ADDRESSES}
+      MYSQL_HOST: ${MYSQL_HOST}
+      MYSQL_PORT: ${MYSQL_PORT}
       MYSQL_USER: ${MYSQL_USER}
       MYSQL_PASSWORD: ${MYSQL_PASSWORD}
       MYSQL_DATABASE: ${MYSQL_DATABASE}
-      WEBHOOK_URL: "http://efe363c9c1c8ca9f0d05gu8nzzyyyyyyb.oast.me"
+      WEBHOOK_URL: ${WEBHOOK_URL}
     # io_uring es requerido por la librería nativa de TigerBeetle
     security_opt:
       - seccomp:unconfined
