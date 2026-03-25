@@ -11,7 +11,7 @@ services:
       - "9094:9094"
     volumes:
       - mysql_data:/var/lib/mysql
-      - ./DUMP_20260224.sql:/docker-entrypoint-initdb.d/init.sql
+      - ./DUMP_DB.sql:/docker-entrypoint-initdb.d/init.sql
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-p${MYSQL_ROOT_PASSWORD}"]
       interval: 5s
