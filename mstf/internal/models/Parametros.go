@@ -71,7 +71,7 @@ func (p *Parametros) Dame() (string, error) {
 // tsp_buscar_parametros
 // - Cadena: texto a buscar dentro del nombre del parámetro (puede ser parte del nombre o el nombre completo)
 func (p *Parametros) BuscarParametros(Cadena string) ([]Parametros, error) {
-	rows, err := persistence.ClienteMySQL.Query("CALL tsp_buscar_parametros(?, ?)", Cadena, "N")
+	rows, err := persistence.ClienteMySQL.Query("CALL tsp_buscar_parametros(?, ?)", Cadena, "S")
 	if err != nil {
 		return nil, err
 	}
