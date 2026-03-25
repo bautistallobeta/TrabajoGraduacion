@@ -26,18 +26,19 @@ services:
     container_name: mstf-kafka
     ports:
       - "9092:9092"
+      - "29092:29092"
     environment:
       # Config de KRaft (Modo Confluent)
       KAFKA_NODE_ID: 1
       KAFKA_PROCESS_ROLES: 'broker,controller'
       KAFKA_CONTROLLER_LISTENER_NAMES: 'CONTROLLER'
-      KAFKA_LISTENERS: 'PLAINTEXT://:9092,CONTROLLER://:9093'
+      KAFKA_LISTENERS: 'PLAINTEXT://:9092,EXTERNAL://:29092,CONTROLLER://:9093'
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: 'CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,EXTERNAL:PLAINTEXT'
       KAFKA_INTER_BROKER_LISTENER_NAME: 'PLAINTEXT'
 
-      # nombre de servicio interno para que LOS otros contenedores puedan conectarse
-    
-      KAFKA_ADVERTISED_LISTENERS: 'PLAINTEXT://kafka:9092'
+      # PLAINTEXT: para contenedores internos (kafka:9092)
+      # EXTERNAL: para conexiones desde localhost:29092 - p test de estres
+      KAFKA_ADVERTISED_LISTENERS: 'PLAINTEXT://kafka:9092,EXTERNAL://localhost:29092'
       # ... (el resto normal)
       # Config de Log y Cluster ID
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
