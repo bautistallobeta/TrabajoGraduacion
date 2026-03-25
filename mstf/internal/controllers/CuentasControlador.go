@@ -34,8 +34,8 @@ func (cc *CuentasControlador) Dame(c echo.Context) error {
 		return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta("Parámetros inválidos: "+utils.SanitizarError(err)))
 	}
 
-	if req.IdUsuarioFinal <= 0 || req.IdMoneda <= 0 {
-		return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta("IdUsuarioFinal e IdMoneda son requeridos y deben ser mayores a cero"))
+	if req.IdMoneda <= 0 {
+		return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta("IdMoneda es requerido y debe ser mayor a cero"))
 	}
 
 	cuenta := &models.Cuentas{IdUsuarioFinal: req.IdUsuarioFinal, IdMoneda: req.IdMoneda}
@@ -72,8 +72,8 @@ func (cc *CuentasControlador) DameHistorial(c echo.Context) error {
 		return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta("Parámetros inválidos: "+utils.SanitizarError(err)))
 	}
 
-	if req.IdUsuarioFinal <= 0 || req.IdMoneda <= 0 {
-		return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta("IdUsuarioFinal e IdMoneda son requeridos y deben ser mayores a cero"))
+	if req.IdMoneda <= 0 {
+		return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta("IdMoneda es requerido y debe ser mayor a cero"))
 	}
 
 	// Parsear query params opcionales (0 = sin filtro)
@@ -160,8 +160,8 @@ func (cc *CuentasControlador) DameTransferencias(c echo.Context) error {
 		return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta("Parámetros inválidos: "+utils.SanitizarError(err)))
 	}
 
-	if req.IdUsuarioFinal <= 0 || req.IdMoneda <= 0 {
-		return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta("IdUsuarioFinal e IdMoneda son requeridos y deben ser mayores a cero"))
+	if req.IdMoneda <= 0 {
+		return c.JSON(http.StatusBadRequest, models.NewErrorRespuesta("IdMoneda es requerido y debe ser mayor a cero"))
 	}
 
 	timestampMinStr := c.QueryParam("TimestampMin")

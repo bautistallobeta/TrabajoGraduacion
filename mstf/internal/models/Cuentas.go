@@ -28,10 +28,6 @@ const limiteHistorialBalancesPorDefecto uint32 = 100
 
 // Instancia los datos de la cuenta leyendo desde TigerBeetle a partir de IdUsuarioFinal e IdMoneda
 func (c *Cuentas) Dame() error {
-	if c.IdUsuarioFinal <= 0 || c.IdMoneda <= 0 {
-		return errors.New("IdUsuarioFinal e IdMoneda son requeridos y deben ser mayores a cero")
-	}
-
 	idCuentaStr := utils.ConcatenarIDString(uint64(c.IdMoneda), c.IdUsuarioFinal)
 	idCuentaCast, err := utils.ParsearUint128(idCuentaStr)
 	if err != nil {
@@ -89,10 +85,6 @@ func (c *Cuentas) Dame() error {
 // - FechaFin: timestamp máximo (inclusive) de las transferencias a buscar
 // - Limite: cantidad máxima de transferencias a retornar (si es 0, se usa un valor por defecto)
 func (c *Cuentas) ListarTransferenciasCuenta(FechaInicio uint64, FechaFin uint64, Limite uint32) ([]types.Transfer, error) {
-	if c.IdUsuarioFinal <= 0 || c.IdMoneda <= 0 {
-		return nil, errors.New("IdUsuarioFinal e IdMoneda son requeridos y deben ser mayores a cero")
-	}
-
 	idCuentaStr := utils.ConcatenarIDString(uint64(c.IdMoneda), c.IdUsuarioFinal)
 	idCuentaCast, err := utils.ParsearUint128(idCuentaStr)
 	if err != nil {
@@ -124,10 +116,6 @@ func (c *Cuentas) ListarTransferenciasCuenta(FechaInicio uint64, FechaFin uint64
 // - FechaFin: timestamp máximo (inclusive) de los balances a buscar
 // - Limite: cantidad máxima de balances a retornar (si es 0, se usa un valor por defecto)
 func (c *Cuentas) ListarHistorialBalances(FechaInicio uint64, FechaFin uint64, Limite uint32) ([]types.AccountBalance, error) {
-	if c.IdUsuarioFinal <= 0 || c.IdMoneda <= 0 {
-		return nil, errors.New("IdUsuarioFinal e IdMoneda son requeridos y deben ser mayores a cero")
-	}
-
 	idCuentaStr := utils.ConcatenarIDString(uint64(c.IdMoneda), c.IdUsuarioFinal)
 	idCuentaCast, err := utils.ParsearUint128(idCuentaStr)
 	if err != nil {
