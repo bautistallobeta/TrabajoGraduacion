@@ -121,6 +121,12 @@ services:
         condition: service_completed_successfully
       tigerbeetle:
         condition: service_started
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 15s
     # Reinicia automáticamente si falla al arrancar
     restart: on-failure
     networks:
@@ -134,7 +140,8 @@ services:
     ports:
       - "5173:80"
     depends_on:
-      - mstf
+      mstf:
+        condition: service_healthy
     networks:
       - mstf-net
 
