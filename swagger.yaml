@@ -2,13 +2,11 @@ openapi: 3.0.3
 info:
   title: MSTF - Microservicio de Transacciones Financieras
   description: |
-    API REST para gestión de cuentas y transferencias financieras sobre TigerBeetle como ledger y MySQL para datos administrativos.
+    API REST Backend MSTF
 
     **Autenticación:** la mayoría de los endpoints requieren credenciales. Se aceptan dos esquemas:
     - `Bearer <token>` — actor USUARIO (token de sesión obtenido en `/usuarios/login`)
     - `X-API-Key: <apikey>` — actor SISTEMA
-
-    Endpoints públicos (sin autenticación): `GET /ping`, `POST /usuarios/login`
   version: 1.0.0
   contact:
     name: Bautista José Llobeta
@@ -204,7 +202,7 @@ paths:
             text/plain:
               schema:
                 type: string
-                example: "pong"
+                example: "API MSTF corriendo."
 
   # ── TRANSFERENCIAS ─────────────────────────────────────────────────────────
 

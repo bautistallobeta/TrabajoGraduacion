@@ -39,14 +39,12 @@ services:
       # PLAINTEXT: para contenedores internos (kafka:9092)
       # EXTERNAL: para conexiones desde localhost:29092 - p test de estres
       KAFKA_ADVERTISED_LISTENERS: 'PLAINTEXT://kafka:9092,EXTERNAL://localhost:29092'
-      # ... (el resto normal)
       # Config de Log y Cluster ID
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
       KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
       KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
       KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
       KAFKA_LOG_DIRS: '/tmp/kafka-logs'
-
       CLUSTER_ID: ${KAFKA_CLUSTER_ID}
       KAFKA_CONTROLLER_QUORUM_VOTERS: '1@kafka:9093'
     healthcheck:
