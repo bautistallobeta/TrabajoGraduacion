@@ -24,12 +24,12 @@ import (
 var (
 	apiURL           = flag.String("api-url", "http://localhost:8080", "URL base del microservicio")
 	apiKey           = flag.String("api-key", "CAMBIAR_ESTE_VALOR", "API Key para saltar auth de usuario")
-	kafkaBroker      = flag.String("kafka-broker", "kafka:9092", "Dirección del broker de Kafka")
+	kafkaBroker      = flag.String("kafka-broker", "localhost:29092", "Dirección del broker de Kafka")
 	kafkaTopic       = flag.String("kafka-topic", "transfers_pendientes", "Topic de Kafka")
 	webhookPort      = flag.String("webhook-port", "9999", "Puerto para recibir webhooks")
-	numMonedas       = flag.Int("monedas", 10, "Cantidad de monedas a crear")
-	cuentasPorMoneda = flag.Int("cuentas", 100, "Cantidad de cuentas a crear por cada moneda")
-	totalTransfers   = flag.Int("transferencias", 100000, "Cantidad total de transferencias a simular")
+	numMonedas       = flag.Int("monedas", 100, "Cantidad de monedas a crear")
+	cuentasPorMoneda = flag.Int("cuentas", 1000, "Cantidad de cuentas a crear por cada moneda")
+	totalTransfers   = flag.Int("transferencias", 50000000, "Cantidad total de transferencias a simular")
 	dockerService    = flag.String("docker-service", "mstf", "Nombre del servicio del MS en docker-compose")
 	autoDocker       = flag.Bool("auto-docker", false, "Si es true, el script hará stop/start del contenedor automáticamente")
 )
@@ -100,8 +100,8 @@ func main() {
 	select {
 	case <-doneChan:
 		calcularResultados()
-	case <-time.After(20 * time.Minute):
-		log.Println("TIMEOUT: Pasaron 20 minutos y no se completaron todas las transferencias.")
+	case <-time.After(50 * time.Minute):
+		log.Println("TIMEOUT: Pasaron 50 minutos y no se completaron todas las transferencias.")
 		calcularResultados()
 	}
 }
