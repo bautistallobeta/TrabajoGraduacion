@@ -135,7 +135,7 @@ func (c *Cuentas) ListarHistorialBalances(FechaInicio uint64, FechaFin uint64, L
 		TimestampMin: FechaInicio,
 		TimestampMax: FechaFin,
 		Limit:        Limite,
-		Flags:        3, // Debits(1) + Credits(2)
+		Flags:        7, // Debits(1) + Credits(2) + Reversed(4)
 	}
 
 	balances, err := persistence.ClienteTB.GetAccountBalances(filtro)
