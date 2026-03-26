@@ -257,7 +257,7 @@ function cambiarTab(tab) {
               <input
                 v-model="filtros.idUsuarioFinal"
                 type="number"
-                min="1"
+                min="0"
                 class="form-control"
                 style="width: 120px"
                 placeholder="ID..."
