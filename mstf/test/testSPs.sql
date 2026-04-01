@@ -2,15 +2,6 @@
 -- Casos de prueba SPs MSTF      --
 -- ----------------------------- --
 
--- Datos iniciales relevantes:
---   Usuarios: IdUsuario=1, Usuario='admin', Estado='A', Rol='A'
---   Parámetros: APIKEY_SISTEMA='CAMBIAR_ESTE_VALOR'
---   Monedas: tabla vacía
---
--- Actores:
---   SISTEMA → pCredencial = API key, pActor = 'SISTEMA'
---   USUARIO → pCredencial = TokenSesion activo, pActor = 'USUARIO'
-
 -- 01. Autenticación
 call tsp_autenticar_actor('APIKEY_INVALIDA', 'SISTEMA');
 call tsp_autenticar_actor('CAMBIAR_ESTE_VALOR', 'SISTEMA');-- OK
@@ -18,10 +9,7 @@ call tsp_autenticar_actor('CAMBIAR_ESTE_VALOR', 'SISTEMA');-- OK
 call tsp_autenticar_actor('tokeninvalidoxxxxxxxxxxxxxxxxxxx', 'USUARIO');
 call tsp_autenticar_actor((SELECT TokenSesion FROM Usuarios WHERE IdUsuario = 1), 'USUARIO');-- OK
 
-
-
 -- 02. Usuarios
-
 call tsp_buscar_usuarios('', 'S');
 call tsp_buscar_usuarios('', 'N');
 call tsp_buscar_usuarios('adm', 'S');
@@ -93,9 +81,6 @@ call tsp_activar_usuario(2, (SELECT TokenSesion FROM Usuarios WHERE IdUsuario = 
 call tsp_buscar_usuarios('', 'S');
 
 -- Borrar usuario
--- usuario2 tiene operaciones registradas (DU/AU) con IdUsuarioActor=1, no con IdUsuario=2
--- pero fue desactivado/activado arriba, las auditorías tienen IdUsuario=1 → puede borrarse si inactivo
--- usuario3 jamás actuó como actor → puede borrarse directamente tras desactivar
 call tsp_borrar_usuario(1, (SELECT TokenSesion FROM Usuarios WHERE IdUsuario = 1), 'USUARIO');-- automodificación
 call tsp_borrar_usuario(999, (SELECT TokenSesion FROM Usuarios WHERE IdUsuario = 1), 'USUARIO');-- no existe
 call tsp_borrar_usuario(2, (SELECT TokenSesion FROM Usuarios WHERE IdUsuario = 1), 'USUARIO');-- activo, no se puede
@@ -106,10 +91,7 @@ call tsp_borrar_usuario(3, (SELECT TokenSesion FROM Usuarios WHERE IdUsuario = 1
 
 call tsp_buscar_usuarios('', 'S');
 
-
-
 -- 03. Parámetros
-
 call tsp_buscar_parametros('', 'N');
 call tsp_buscar_parametros('', 'S');
 call tsp_buscar_parametros('LIMITE', 'N');
@@ -135,7 +117,6 @@ call tsp_modificar_parametro('CAMBIAR_ESTE_VALOR', 'SISTEMA', 'MONTOMAXTRANSFER'
 
 
 -- 04. Monedas
-
 call tsp_listar_monedas('N');-- solo activas
 call tsp_listar_monedas('S');-- activas e inactivas
 call tsp_listar_monedas('T');-- todas (A, I, P)
@@ -180,3 +161,6 @@ call tsp_borrar_moneda((SELECT TokenSesion FROM Usuarios WHERE IdUsuario = 1), '
 
 call tsp_listar_monedas('S');-- quedan 1 y 2
 call tsp_listar_monedas('T');-- igual, quedan 1 y 2
+call tsp_listar_monedas('N');-- solo activas
+call tsp_listar_monedas('S');-- activas e inactivas
+call tsp_listar_monedas('T');-- todas (A, I, P)
