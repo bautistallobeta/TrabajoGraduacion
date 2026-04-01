@@ -13,7 +13,7 @@ services:
       - mysql_data:/var/lib/mysql
       - ./DUMP_DB.sql:/docker-entrypoint-initdb.d/init.sql
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-p${MYSQL_ROOT_PASSWORD}"]
+      test: [ "CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-p${MYSQL_ROOT_PASSWORD}" ]
       interval: 5s
       timeout: 3s
       retries: 10
@@ -48,7 +48,7 @@ services:
       CLUSTER_ID: ${KAFKA_CLUSTER_ID}
       KAFKA_CONTROLLER_QUORUM_VOTERS: '1@kafka:9093'
     healthcheck:
-      test: ["CMD-SHELL", "kafka-broker-api-versions --bootstrap-server localhost:9092 2>/dev/null || exit 1"]
+      test: [ "CMD-SHELL", "kafka-broker-api-versions --bootstrap-server localhost:9092 2>/dev/null || exit 1" ]
       interval: 5s
       timeout: 10s
       retries: 20
@@ -62,14 +62,9 @@ services:
     depends_on:
       kafka:
         condition: service_healthy
-    entrypoint: ["/bin/sh", "-c"]
+    entrypoint: [ "/bin/sh", "-c" ]
     command: >
-      "kafka-topics --bootstrap-server kafka:9092
-      --create --if-not-exists
-      --topic ${KAFKA_TOPIC_TRANSFERS}
-      --partitions 1
-      --replication-factor 1 &&
-      echo 'Topic ${KAFKA_TOPIC_TRANSFERS} listo'"
+      "kafka-topics --bootstrap-server kafka:9092 --create --if-not-exists --topic ${KAFKA_TOPIC_TRANSFERS} --partitions 1 --replication-factor 1 && echo 'Topic ${KAFKA_TOPIC_TRANSFERS} listo'"
     networks:
       - mstf-net
 
@@ -77,11 +72,9 @@ services:
     image: ghcr.io/tigerbeetle/tigerbeetle:0.16.61
     container_name: mstf-tigerbeetle
     # Formatea el archivo de datos si no existe
-    entrypoint: ["/bin/sh", "-c"]
+    entrypoint: [ "/bin/sh", "-c" ]
     command: >
-      "[ -f /data/0_0.tigerbeetle ] ||
-      /tigerbeetle format --cluster=0 --replica=0 --replica-count=1 /data/0_0.tigerbeetle &&
-      exec /tigerbeetle start --addresses=0.0.0.0:3000 --cache-grid=1GiB /data/0_0.tigerbeetle"
+      "[ -f /data/0_0.tigerbeetle ] || /tigerbeetle format --cluster=0 --replica=0 --replica-count=1 /data/0_0.tigerbeetle && exec /tigerbeetle start --addresses=0.0.0.0:3000 --cache-grid=256MiB /data/0_0.tigerbeetle"
     volumes:
       - tb_data:/data
     # io_uring es req por TigerBeetle
@@ -121,7 +114,7 @@ services:
       tigerbeetle:
         condition: service_started
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:8080/ping"]
+      test: [ "CMD", "wget", "-qO-", "http://localhost:8080/ping" ]
       interval: 5s
       timeout: 3s
       retries: 10

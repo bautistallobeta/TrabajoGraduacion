@@ -181,6 +181,52 @@ components:
         TokenSesion:
           type: string
           example: "abc123token"
+    MensajeKafkaTransferencia:
+      type: object
+      description: Estructura del mensaje JSON esperado en el topic de Kafka para procesar transacciones desde MisGastos.
+      properties:
+        IdTransferencia:
+          type: string
+          example: "123456789101112131415"
+          description: Identificador unico de la transferencia.
+        IdUsuarioFinal:
+          type: integer
+          format: int64
+          example: 101
+          description: ID del usuario final de la cuenta.
+        Monto:
+          type: number
+          format: double
+          example: 1500.50
+          description: Valor de la transaccion.
+        IdMoneda:
+          type: integer
+          format: int32
+          example: 1
+          description: Identificador de la moneda.
+        Tipo:
+          type: string
+          example: "E"
+          description: Categoria operativa de la transferencia (I Ingreso / E Egreso).
+        IdCategoria:
+          type: integer
+          format: int64
+          example: 5
+          description: ID de la categoria de gasto/ingreso definida por el usuario final.
+        Fecha:
+          type: string
+          format: date-time
+          example: "2026-01-27 15:04:05"
+          description: Fecha y hora del movimiento.
+      required:
+        - IdTransferencia
+        - IdUsuarioFinal
+        - Monto
+        - IdMoneda
+        - Tipo
+        - Fecha
+
+      
 
 security:
   - BearerAuth: []

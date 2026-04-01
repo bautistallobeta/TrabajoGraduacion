@@ -279,9 +279,9 @@ func (gt *GestorTransferencias) CrearLote(Batch []types.Transfer, KafkaMsgs []mo
 		}
 	}
 
-	if len(fallidas) > 0 {
+	/*if len(fallidas) > 0 {
 		//log.Printf("VALIDACIÓN: %d de %d transfers rechazadas antes de TigerBeetle.", len(fallidas), len(Batch)+len(FallidasParseo))
-	}
+	}*/
 
 	var results []types.TransferEventResult
 	if len(paraEnviar) > 0 {
